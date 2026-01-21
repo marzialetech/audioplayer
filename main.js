@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -7,7 +7,20 @@ const store = new Store();
 
 let mainWindow;
 
+// Set app name (important for macOS dock and menu bar)
+app.setName('AudioPlayer by Pixamation');
+
+// Set dock icon on macOS before app is ready
+if (process.platform === 'darwin') {
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  if (fs.existsSync(iconPath)) {
+    app.dock.setIcon(iconPath);
+  }
+}
+
 function createWindow() {
+  const iconPath = path.join(__dirname, 'assets', 'icon.png');
+  
   mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -18,9 +31,14 @@ function createWindow() {
       contextIsolation: true,
       nodeIntegration: false
     },
-    icon: path.join(__dirname, 'assets', 'icon.png'),
+    icon: iconPath,
     title: 'AudioPlayer by Pixamation'
   });
+  
+  // Set dock icon again after window creation (ensures it sticks)
+  if (process.platform === 'darwin' && app.dock) {
+    app.dock.setIcon(iconPath);
+  }
 
   mainWindow.loadFile('index.html');
 

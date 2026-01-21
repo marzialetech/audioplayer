@@ -41,7 +41,9 @@
     ],
     "mac": {
       "category": "public.app-category.music",
-      "icon": "assets/icon.icns"
+      "icon": "assets/icon.png",
+      "target": ["dmg", "zip"],
+      "darkModeSupport": true
     },
     "win": {
       "icon": "assets/icon.ico"
