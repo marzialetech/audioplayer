@@ -58,22 +58,18 @@ body {
   transform: scale(1.05);
 }
 
-.brand-text {
-  display: flex;
-  flex-direction: column;
-}
-
-.brand-text h1 {
+.brand h1 {
   font-size: 32px;
   color: var(--accent-blue);
   text-shadow: 0 0 20px rgba(0, 217, 255, 0.5);
-  line-height: 1.2;
+  line-height: 1;
+  margin: 0;
 }
 
 .pixamation-logo {
-  height: 20px;
+  height: 32px;
   width: auto;
-  margin-top: 4px;
+  object-fit: contain;
   filter: brightness(0) invert(1);
   opacity: 0.9;
 }

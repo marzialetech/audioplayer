@@ -3,21 +3,22 @@
  * Browser-based audio playback application
  */
 
+// Constants
+const DECK_COUNT = 20;
+
 // State Management
 const state = {
   audioLibrary: [], // Array of {name, file, url}
-  decks: {
-    1: { audio: null, file: null, playing: false },
-    2: { audio: null, file: null, playing: false },
-    3: { audio: null, file: null, playing: false },
-    4: { audio: null, file: null, playing: false }
-  },
-  hotButtons: {},
-  queue: [],
+  decks: {},
   selectedFile: null,
   masterVolume: 1,
   searchQuery: ''
 };
+
+// Initialize decks 1-10
+for (let i = 1; i <= DECK_COUNT; i++) {
+  state.decks[i] = { audio: null, file: null, playing: false, queued: false };
+}
 
 // DOM Elements
 const elements = {
@@ -29,9 +30,9 @@ const elements = {
   searchInput: document.getElementById('searchInput'),
   btnSearch: document.getElementById('btnSearch'),
   fileList: document.getElementById('fileList'),
-  queueList: document.getElementById('queueList'),
   hotButtonsGrid: document.getElementById('hotButtonsGrid'),
   contextMenu: document.getElementById('contextMenu'),
+  deckSelectMenu: document.getElementById('deckSelectMenu'),
   dropOverlay: document.getElementById('dropOverlay'),
   statusMessage: document.getElementById('statusMessage'),
   statusTime: document.getElementById('statusTime')
@@ -42,7 +43,7 @@ function init() {
   console.log('Initializing AudioPlayer Web App...');
   
   // Initialize audio elements
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= DECK_COUNT; i++) {
     state.decks[i].audio = document.getElementById(`audio${i}`);
     setupDeckAudio(i);
   }
@@ -63,11 +64,19 @@ function init() {
 // Load saved settings from localStorage
 function loadSettings() {
   try {
-    // Load hot buttons
+    // Hot buttons can't fully persist in web version (no file access)
+    // But we can show the names
     const hotButtons = localStorage.getItem('audioPlayerHotButtons');
     if (hotButtons) {
-      state.hotButtons = JSON.parse(hotButtons);
-      updateHotButtonsDisplay();
+      const data = JSON.parse(hotButtons);
+      // Just update display with names (files need to be re-added)
+      for (const [slot, info] of Object.entries(data)) {
+        if (info && info.name) {
+          const button = document.querySelector(`.hot-button[data-slot="${slot}"]`);
+          const label = button.querySelector('.hot-label');
+          label.textContent = info.name.replace(/\.[^/.]+$/, '') + ' (reload)';
+        }
+      }
     }
   } catch (error) {
     console.error('Error loading settings:', error);
@@ -93,11 +102,13 @@ function setupDeckAudio(deckNum) {
   audio.addEventListener('play', () => {
     state.decks[deckNum].playing = true;
     updateDeckState(deckNum, 'playing');
+    updateHotButtonState(deckNum, 'playing');
   });
   
   audio.addEventListener('pause', () => {
     state.decks[deckNum].playing = false;
     updateDeckState(deckNum, 'paused');
+    updateHotButtonState(deckNum, 'paused');
   });
 }
 
@@ -150,7 +161,12 @@ function setupEventListeners() {
   });
   
   document.querySelectorAll('.btn-remove').forEach(btn => {
-    btn.addEventListener('click', () => removeDeck(btn.dataset.deck));
+    btn.addEventListener('click', () => clearDeck(btn.dataset.deck));
+  });
+  
+  // Queue toggle buttons
+  document.querySelectorAll('.btn-queue').forEach(btn => {
+    btn.addEventListener('click', () => toggleQueue(btn.dataset.deck));
   });
   
   document.querySelectorAll('.deck-volume').forEach(slider => {
@@ -174,12 +190,18 @@ function setupEventListeners() {
     });
   });
   
-  // Hot buttons
+  // Hot buttons - click to play, right-click to clear
   document.querySelectorAll('.hot-button').forEach(btn => {
-    btn.addEventListener('click', () => playHotButton(btn.dataset.slot));
+    btn.addEventListener('click', () => {
+      const slot = parseInt(btn.dataset.slot);
+      if (state.decks[slot].file) {
+        playDeck(slot);
+      }
+    });
+    
     btn.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      clearHotButton(btn.dataset.slot);
+      clearDeck(btn.dataset.slot);
     });
     
     // Drag and drop for hot buttons
@@ -199,7 +221,8 @@ function setupEventListeners() {
       if (fileIndex !== '') {
         const file = state.audioLibrary[parseInt(fileIndex)];
         if (file) {
-          assignHotButton(btn.dataset.slot, file);
+          // Load to both hot button and corresponding deck
+          loadToDeck(btn.dataset.slot, file);
         }
       }
     });
@@ -229,28 +252,6 @@ function setupEventListeners() {
     });
   });
   
-  // Queue drag and drop
-  elements.queueList.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    elements.queueList.classList.add('drag-over');
-  });
-  
-  elements.queueList.addEventListener('dragleave', () => {
-    elements.queueList.classList.remove('drag-over');
-  });
-  
-  elements.queueList.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.queueList.classList.remove('drag-over');
-    const fileIndex = e.dataTransfer.getData('text/fileindex');
-    if (fileIndex !== '') {
-      const file = state.audioLibrary[parseInt(fileIndex)];
-      if (file) {
-        addToQueue(file);
-      }
-    }
-  });
-  
   // Global drag and drop for adding files
   document.addEventListener('dragover', (e) => {
     e.preventDefault();
@@ -277,6 +278,7 @@ function setupEventListeners() {
   // Context menu
   document.addEventListener('click', () => {
     elements.contextMenu.style.display = 'none';
+    elements.deckSelectMenu.style.display = 'none';
   });
   
   // Keyboard shortcuts
@@ -316,10 +318,13 @@ function clearLibrary() {
   });
   
   state.audioLibrary = [];
-  state.queue = [];
+  
+  // Clear all decks
+  for (let i = 1; i <= DECK_COUNT; i++) {
+    clearDeck(i);
+  }
   
   renderFileList();
-  updateQueueDisplay();
   setStatus('Library cleared');
 }
 
@@ -389,30 +394,29 @@ function showContextMenu(e, file) {
   elements.contextMenu.querySelectorAll('.context-item').forEach(item => {
     item.onclick = () => {
       const action = item.dataset.action;
-      handleContextAction(action, file);
-      elements.contextMenu.style.display = 'none';
+      handleContextAction(action, file, e);
     };
   });
 }
 
 // Handle context menu action
-function handleContextAction(action, file) {
-  switch (action) {
-    case 'load-deck':
-      loadToFirstEmptyDeck(file);
-      break;
-    case 'add-queue':
-      addToQueue(file);
-      break;
-    case 'assign-hot':
-      // Find first empty hot button
-      for (let i = 1; i <= 10; i++) {
-        if (!state.hotButtons[i]) {
-          assignHotButton(i, file);
-          break;
-        }
-      }
-      break;
+function handleContextAction(action, file, e) {
+  elements.contextMenu.style.display = 'none';
+  
+  if (action === 'load-deck' || action === 'assign-hot') {
+    // Show deck selection submenu
+    elements.deckSelectMenu.style.display = 'block';
+    elements.deckSelectMenu.style.left = `${e.clientX + 150}px`;
+    elements.deckSelectMenu.style.top = `${e.clientY}px`;
+    
+    // Setup deck selection
+    elements.deckSelectMenu.querySelectorAll('.deck-select-item').forEach(item => {
+      item.onclick = () => {
+        const deckNum = item.dataset.deck;
+        loadToDeck(deckNum, file);
+        elements.deckSelectMenu.style.display = 'none';
+      };
+    });
   }
 }
 
@@ -429,20 +433,28 @@ function performSearch() {
   }
 }
 
-// Load to deck
+// Load to deck (and sync with hot button)
 function loadToDeck(deckNum, file) {
+  deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   audio.src = file.url;
   state.decks[deckNum].file = file;
   
   document.getElementById(`deckFilename${deckNum}`).textContent = file.name;
   updateDeckState(deckNum, 'loaded');
+  
+  // Sync with hot button display
+  updateHotButtonDisplay(deckNum);
+  
+  // Save to localStorage (names only for web)
+  saveHotButtons();
+  
   setStatus(`Loaded: ${file.name}`);
 }
 
 // Load to first empty deck
 function loadToFirstEmptyDeck(file) {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= DECK_COUNT; i++) {
     if (!state.decks[i].file) {
       loadToDeck(i, file);
       return i;
@@ -455,6 +467,7 @@ function loadToFirstEmptyDeck(file) {
 
 // Play deck
 function playDeck(deckNum) {
+  deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   if (audio.src) {
     audio.play();
@@ -464,6 +477,7 @@ function playDeck(deckNum) {
 
 // Pause deck
 function pauseDeck(deckNum) {
+  deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   if (!audio.paused) {
     audio.pause();
@@ -473,33 +487,63 @@ function pauseDeck(deckNum) {
 
 // Stop deck
 function stopDeck(deckNum) {
+  deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   audio.pause();
   audio.currentTime = 0;
   updateDeckState(deckNum, 'stopped');
+  updateHotButtonState(deckNum, 'stopped');
   setStatus(`Stopped deck ${deckNum}`);
 }
 
-// Remove deck
-function removeDeck(deckNum) {
+// Clear deck and synced hot button
+function clearDeck(deckNum) {
+  deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   audio.pause();
   audio.src = '';
   audio.currentTime = 0;
   state.decks[deckNum].file = null;
   state.decks[deckNum].playing = false;
+  state.decks[deckNum].queued = false;
   
   document.getElementById(`deckFilename${deckNum}`).textContent = '-- Empty --';
   document.getElementById(`deckElapsed${deckNum}`).textContent = '00:00';
   document.getElementById(`deckLength${deckNum}`).textContent = '00:00';
-  document.getElementById(`deckRemaining${deckNum}`).textContent = '00:00';
+  document.getElementById(`deckRemaining${deckNum}`).textContent = '-00:00';
   document.getElementById(`deckProgress${deckNum}`).style.width = '0%';
   
   updateDeckState(deckNum, 'empty');
-  setStatus(`Cleared deck ${deckNum}`);
+  updateHotButtonDisplay(deckNum);
+  updateQueueButtonState(deckNum);
   
-  // Load next from queue
-  loadNextFromQueue(deckNum);
+  // Save to localStorage
+  saveHotButtons();
+  
+  setStatus(`Cleared deck ${deckNum}`);
+}
+
+// Toggle queue state for a deck
+function toggleQueue(deckNum) {
+  deckNum = parseInt(deckNum);
+  state.decks[deckNum].queued = !state.decks[deckNum].queued;
+  updateQueueButtonState(deckNum);
+  
+  if (state.decks[deckNum].queued) {
+    setStatus(`Deck ${deckNum} queued to play after deck ${deckNum - 1}`);
+  } else {
+    setStatus(`Deck ${deckNum} removed from queue`);
+  }
+}
+
+// Update queue button visual state
+function updateQueueButtonState(deckNum) {
+  const btn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
+  if (state.decks[deckNum].queued) {
+    btn.classList.add('active');
+  } else {
+    btn.classList.remove('active');
+  }
 }
 
 // Update deck display
@@ -508,7 +552,7 @@ function updateDeckDisplay(deckNum) {
   const duration = audio.duration || 0;
   
   document.getElementById(`deckLength${deckNum}`).textContent = formatTime(duration);
-  document.getElementById(`deckRemaining${deckNum}`).textContent = formatTime(duration);
+  document.getElementById(`deckRemaining${deckNum}`).textContent = '-' + formatTime(duration);
 }
 
 // Update deck progress
@@ -520,7 +564,7 @@ function updateDeckProgress(deckNum) {
   const progress = duration ? (currentTime / duration) * 100 : 0;
   
   document.getElementById(`deckElapsed${deckNum}`).textContent = formatTime(currentTime);
-  document.getElementById(`deckRemaining${deckNum}`).textContent = formatTime(remaining);
+  document.getElementById(`deckRemaining${deckNum}`).textContent = '-' + formatTime(remaining);
   document.getElementById(`deckProgress${deckNum}`).style.width = `${progress}%`;
 }
 
@@ -531,27 +575,48 @@ function updateDeckState(deckNum, deckState) {
   deck.classList.add(deckState);
 }
 
-// On deck ended
-function onDeckEnded(deckNum) {
-  updateDeckState(deckNum, 'loaded');
-  state.decks[deckNum].playing = false;
-  
-  // Auto-load next from queue
-  loadNextFromQueue(deckNum);
+// Update hot button state
+function updateHotButtonState(deckNum, buttonState) {
+  const button = document.querySelector(`.hot-button[data-slot="${deckNum}"]`);
+  button.classList.remove('playing', 'paused', 'stopped');
+  if (buttonState === 'playing') {
+    button.classList.add('playing');
+  }
 }
 
-// Load next from queue
-function loadNextFromQueue(deckNum) {
-  if (state.queue.length > 0) {
-    const next = state.queue.shift();
-    loadToDeck(deckNum, next);
-    updateQueueDisplay();
+// Update hot button display (sync with deck)
+function updateHotButtonDisplay(deckNum) {
+  const button = document.querySelector(`.hot-button[data-slot="${deckNum}"]`);
+  const label = button.querySelector('.hot-label');
+  
+  if (state.decks[deckNum].file) {
+    label.textContent = state.decks[deckNum].file.name.replace(/\.[^/.]+$/, '');
+    button.classList.add('assigned');
+  } else {
+    label.textContent = 'Empty';
+    button.classList.remove('assigned', 'playing');
+  }
+}
+
+// On deck ended - check sequential queue
+function onDeckEnded(deckNum) {
+  deckNum = parseInt(deckNum);
+  updateDeckState(deckNum, 'loaded');
+  updateHotButtonState(deckNum, 'stopped');
+  state.decks[deckNum].playing = false;
+  
+  // Check if next deck (N+1) is queued
+  const nextDeck = deckNum + 1;
+  if (nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file) {
+    // Play the next deck
+    playDeck(nextDeck);
+    setStatus(`Auto-playing queued deck ${nextDeck}`);
   }
 }
 
 // Update all deck volumes
 function updateAllDeckVolumes() {
-  for (let i = 1; i <= 4; i++) {
+  for (let i = 1; i <= DECK_COUNT; i++) {
     const slider = document.querySelector(`.deck-volume[data-deck="${i}"]`);
     const audio = state.decks[i].audio;
     audio.volume = (slider.value / 100) * state.masterVolume;
@@ -566,98 +631,15 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Hot button functions
-function assignHotButton(slot, file) {
-  state.hotButtons[slot] = file;
-  updateHotButtonsDisplay();
-  saveHotButtons();
-  setStatus(`Assigned hot button ${slot}: ${file.name}`);
-}
-
-function playHotButton(slot) {
-  const file = state.hotButtons[slot];
-  if (file) {
-    const deckNum = loadToFirstEmptyDeck(file);
-    playDeck(deckNum);
-    
-    // Visual feedback
-    const button = document.querySelector(`.hot-button[data-slot="${slot}"]`);
-    button.classList.add('playing');
-    setTimeout(() => button.classList.remove('playing'), 1000);
-  }
-}
-
-function clearHotButton(slot) {
-  if (state.hotButtons[slot]) {
-    delete state.hotButtons[slot];
-    updateHotButtonsDisplay();
-    saveHotButtons();
-    setStatus(`Cleared hot button ${slot}`);
-  }
-}
-
-function updateHotButtonsDisplay() {
-  for (let i = 1; i <= 10; i++) {
-    const button = document.querySelector(`.hot-button[data-slot="${i}"]`);
-    const label = button.querySelector('.hot-label');
-    
-    if (state.hotButtons[i]) {
-      label.textContent = state.hotButtons[i].name.replace(/\.[^/.]+$/, '');
-      button.classList.add('assigned');
-    } else {
-      label.textContent = 'Empty';
-      button.classList.remove('assigned');
+// Save hot buttons (names only for web - files can't persist)
+function saveHotButtons() {
+  const hotButtonData = {};
+  for (let i = 1; i <= DECK_COUNT; i++) {
+    if (state.decks[i].file) {
+      hotButtonData[i] = { name: state.decks[i].file.name };
     }
   }
-}
-
-function saveHotButtons() {
-  // Save hot button names (can't persist file URLs across sessions)
-  const hotButtonData = {};
-  for (const [slot, file] of Object.entries(state.hotButtons)) {
-    hotButtonData[slot] = { name: file.name };
-  }
   localStorage.setItem('audioPlayerHotButtons', JSON.stringify(hotButtonData));
-}
-
-// Queue functions
-function addToQueue(file) {
-  state.queue.push(file);
-  updateQueueDisplay();
-  setStatus(`Added to queue: ${file.name}`);
-}
-
-function removeFromQueue(index) {
-  state.queue.splice(index, 1);
-  updateQueueDisplay();
-}
-
-function updateQueueDisplay() {
-  if (state.queue.length === 0) {
-    elements.queueList.innerHTML = '<p class="queue-empty">Queue is empty. Drag files here or use Add to Queue.</p>';
-    return;
-  }
-  
-  elements.queueList.innerHTML = '';
-  state.queue.forEach((item, index) => {
-    const queueItem = document.createElement('div');
-    queueItem.className = 'queue-item';
-    queueItem.innerHTML = `
-      <span>${index + 1}. ${item.name}</span>
-      <button class="queue-remove" data-index="${index}">×</button>
-    `;
-    
-    queueItem.querySelector('.queue-remove').addEventListener('click', () => {
-      removeFromQueue(index);
-    });
-    
-    queueItem.addEventListener('dblclick', () => {
-      loadToFirstEmptyDeck(item);
-      removeFromQueue(index);
-    });
-    
-    elements.queueList.appendChild(queueItem);
-  });
 }
 
 // Keyboard shortcuts
@@ -665,21 +647,33 @@ function handleKeyboard(e) {
   // Don't trigger shortcuts when typing in input
   if (e.target.matches('input')) return;
   
-  // Number keys 1-4 for decks
-  if (e.key >= '1' && e.key <= '4' && !e.ctrlKey && !e.altKey) {
-    if (e.shiftKey) {
-      stopDeck(e.key);
-    } else {
-      playDeck(e.key);
+  // Number keys 1-9 and 0 for decks (0 = deck 10)
+  if (!e.ctrlKey && !e.altKey) {
+    if (e.key >= '1' && e.key <= '9') {
+      const deckNum = parseInt(e.key);
+      if (e.shiftKey) {
+        stopDeck(deckNum);
+      } else {
+        playDeck(deckNum);
+      }
+      e.preventDefault();
+    } else if (e.key === '0') {
+      if (e.shiftKey) {
+        stopDeck(10);
+      } else {
+        playDeck(10);
+      }
+      e.preventDefault();
     }
-    e.preventDefault();
   }
   
-  // Function keys F1-F10 for hot buttons
+  // Function keys F1-F10 for hot buttons (same as decks now)
   if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
     const num = parseInt(e.key.slice(1));
     if (num >= 1 && num <= 10) {
-      playHotButton(num);
+      if (state.decks[num].file) {
+        playDeck(num);
+      }
       e.preventDefault();
     }
   }
@@ -700,6 +694,7 @@ function handleKeyboard(e) {
   // Escape to close context menu
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
+    elements.deckSelectMenu.style.display = 'none';
   }
 }
 

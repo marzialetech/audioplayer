@@ -13,10 +13,8 @@
     <header class="app-header">
       <div class="brand">
         <img src="assets/icon.png" alt="AudioPlayer" class="app-logo">
-        <div class="brand-text">
-          <h1>AudioPlayer</h1>
-          <img src="assets/pixamation-logo.png" alt="by Pixamation" class="pixamation-logo">
-        </div>
+        <h1>AudioPlayer</h1>
+        <img src="assets/pixamation-logo.png" alt="by Pixamation" class="pixamation-logo">
       </div>
       <div class="master-controls">
         <label>Master Volume:</label>
@@ -31,30 +29,21 @@
       <section class="audio-decks-panel">
         <h2>Audio Decks</h2>
         <div class="audio-decks" id="audioDecks">
-          <!-- Audio Deck 1 -->
+          <!-- Audio Decks 1-20 -->
           <div class="audio-deck" data-deck="1">
             <div class="deck-header">
               <span class="deck-number">1</span>
               <span class="deck-filename" id="deckFilename1">-- Empty --</span>
+              <button class="btn-queue" data-deck="1" title="Queue after previous">Q</button>
               <button class="btn-remove" data-deck="1" title="Remove">×</button>
             </div>
             <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed1">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength1">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining1">00:00</span>
-              </div>
+              <span class="timer elapsed" id="deckElapsed1">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength1">00:00</span>
+              <span class="timer remaining" id="deckRemaining1">-00:00</span>
             </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress1"></div>
-            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress1"></div></div>
             <div class="deck-controls">
               <button class="btn-play" data-deck="1" title="Play">▶</button>
               <button class="btn-pause" data-deck="1" title="Pause">⏸</button>
@@ -64,30 +53,20 @@
             <audio id="audio1" preload="metadata"></audio>
           </div>
 
-          <!-- Audio Deck 2 -->
           <div class="audio-deck" data-deck="2">
             <div class="deck-header">
               <span class="deck-number">2</span>
               <span class="deck-filename" id="deckFilename2">-- Empty --</span>
+              <button class="btn-queue" data-deck="2" title="Queue after previous">Q</button>
               <button class="btn-remove" data-deck="2" title="Remove">×</button>
             </div>
             <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed2">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength2">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining2">00:00</span>
-              </div>
+              <span class="timer elapsed" id="deckElapsed2">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength2">00:00</span>
+              <span class="timer remaining" id="deckRemaining2">-00:00</span>
             </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress2"></div>
-            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress2"></div></div>
             <div class="deck-controls">
               <button class="btn-play" data-deck="2" title="Play">▶</button>
               <button class="btn-pause" data-deck="2" title="Pause">⏸</button>
@@ -97,30 +76,20 @@
             <audio id="audio2" preload="metadata"></audio>
           </div>
 
-          <!-- Audio Deck 3 -->
           <div class="audio-deck" data-deck="3">
             <div class="deck-header">
               <span class="deck-number">3</span>
               <span class="deck-filename" id="deckFilename3">-- Empty --</span>
+              <button class="btn-queue" data-deck="3" title="Queue after previous">Q</button>
               <button class="btn-remove" data-deck="3" title="Remove">×</button>
             </div>
             <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed3">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength3">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining3">00:00</span>
-              </div>
+              <span class="timer elapsed" id="deckElapsed3">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength3">00:00</span>
+              <span class="timer remaining" id="deckRemaining3">-00:00</span>
             </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress3"></div>
-            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress3"></div></div>
             <div class="deck-controls">
               <button class="btn-play" data-deck="3" title="Play">▶</button>
               <button class="btn-pause" data-deck="3" title="Pause">⏸</button>
@@ -130,30 +99,20 @@
             <audio id="audio3" preload="metadata"></audio>
           </div>
 
-          <!-- Audio Deck 4 -->
           <div class="audio-deck" data-deck="4">
             <div class="deck-header">
               <span class="deck-number">4</span>
               <span class="deck-filename" id="deckFilename4">-- Empty --</span>
+              <button class="btn-queue" data-deck="4" title="Queue after previous">Q</button>
               <button class="btn-remove" data-deck="4" title="Remove">×</button>
             </div>
             <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed4">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength4">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining4">00:00</span>
-              </div>
+              <span class="timer elapsed" id="deckElapsed4">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength4">00:00</span>
+              <span class="timer remaining" id="deckRemaining4">-00:00</span>
             </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress4"></div>
-            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress4"></div></div>
             <div class="deck-controls">
               <button class="btn-play" data-deck="4" title="Play">▶</button>
               <button class="btn-pause" data-deck="4" title="Pause">⏸</button>
@@ -162,13 +121,373 @@
             </div>
             <audio id="audio4" preload="metadata"></audio>
           </div>
-        </div>
 
-        <!-- Queue Section -->
-        <div class="queue-section">
-          <h3>Queue</h3>
-          <div class="queue-list" id="queueList">
-            <p class="queue-empty">Queue is empty. Drag files here or use the Queue button.</p>
+          <div class="audio-deck" data-deck="5">
+            <div class="deck-header">
+              <span class="deck-number">5</span>
+              <span class="deck-filename" id="deckFilename5">-- Empty --</span>
+              <button class="btn-queue" data-deck="5" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="5" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed5">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength5">00:00</span>
+              <span class="timer remaining" id="deckRemaining5">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress5"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="5" title="Play">▶</button>
+              <button class="btn-pause" data-deck="5" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="5" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="5" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio5" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="6">
+            <div class="deck-header">
+              <span class="deck-number">6</span>
+              <span class="deck-filename" id="deckFilename6">-- Empty --</span>
+              <button class="btn-queue" data-deck="6" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="6" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed6">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength6">00:00</span>
+              <span class="timer remaining" id="deckRemaining6">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress6"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="6" title="Play">▶</button>
+              <button class="btn-pause" data-deck="6" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="6" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="6" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio6" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="7">
+            <div class="deck-header">
+              <span class="deck-number">7</span>
+              <span class="deck-filename" id="deckFilename7">-- Empty --</span>
+              <button class="btn-queue" data-deck="7" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="7" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed7">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength7">00:00</span>
+              <span class="timer remaining" id="deckRemaining7">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress7"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="7" title="Play">▶</button>
+              <button class="btn-pause" data-deck="7" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="7" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="7" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio7" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="8">
+            <div class="deck-header">
+              <span class="deck-number">8</span>
+              <span class="deck-filename" id="deckFilename8">-- Empty --</span>
+              <button class="btn-queue" data-deck="8" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="8" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed8">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength8">00:00</span>
+              <span class="timer remaining" id="deckRemaining8">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress8"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="8" title="Play">▶</button>
+              <button class="btn-pause" data-deck="8" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="8" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="8" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio8" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="9">
+            <div class="deck-header">
+              <span class="deck-number">9</span>
+              <span class="deck-filename" id="deckFilename9">-- Empty --</span>
+              <button class="btn-queue" data-deck="9" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="9" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed9">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength9">00:00</span>
+              <span class="timer remaining" id="deckRemaining9">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress9"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="9" title="Play">▶</button>
+              <button class="btn-pause" data-deck="9" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="9" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="9" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio9" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="10">
+            <div class="deck-header">
+              <span class="deck-number">10</span>
+              <span class="deck-filename" id="deckFilename10">-- Empty --</span>
+              <button class="btn-queue" data-deck="10" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="10" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed10">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength10">00:00</span>
+              <span class="timer remaining" id="deckRemaining10">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress10"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="10" title="Play">▶</button>
+              <button class="btn-pause" data-deck="10" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="10" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="10" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio10" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="11">
+            <div class="deck-header">
+              <span class="deck-number">11</span>
+              <span class="deck-filename" id="deckFilename11">-- Empty --</span>
+              <button class="btn-queue" data-deck="11" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="11" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed11">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength11">00:00</span>
+              <span class="timer remaining" id="deckRemaining11">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress11"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="11" title="Play">▶</button>
+              <button class="btn-pause" data-deck="11" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="11" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="11" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio11" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="12">
+            <div class="deck-header">
+              <span class="deck-number">12</span>
+              <span class="deck-filename" id="deckFilename12">-- Empty --</span>
+              <button class="btn-queue" data-deck="12" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="12" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed12">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength12">00:00</span>
+              <span class="timer remaining" id="deckRemaining12">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress12"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="12" title="Play">▶</button>
+              <button class="btn-pause" data-deck="12" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="12" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="12" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio12" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="13">
+            <div class="deck-header">
+              <span class="deck-number">13</span>
+              <span class="deck-filename" id="deckFilename13">-- Empty --</span>
+              <button class="btn-queue" data-deck="13" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="13" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed13">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength13">00:00</span>
+              <span class="timer remaining" id="deckRemaining13">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress13"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="13" title="Play">▶</button>
+              <button class="btn-pause" data-deck="13" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="13" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="13" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio13" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="14">
+            <div class="deck-header">
+              <span class="deck-number">14</span>
+              <span class="deck-filename" id="deckFilename14">-- Empty --</span>
+              <button class="btn-queue" data-deck="14" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="14" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed14">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength14">00:00</span>
+              <span class="timer remaining" id="deckRemaining14">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress14"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="14" title="Play">▶</button>
+              <button class="btn-pause" data-deck="14" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="14" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="14" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio14" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="15">
+            <div class="deck-header">
+              <span class="deck-number">15</span>
+              <span class="deck-filename" id="deckFilename15">-- Empty --</span>
+              <button class="btn-queue" data-deck="15" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="15" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed15">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength15">00:00</span>
+              <span class="timer remaining" id="deckRemaining15">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress15"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="15" title="Play">▶</button>
+              <button class="btn-pause" data-deck="15" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="15" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="15" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio15" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="16">
+            <div class="deck-header">
+              <span class="deck-number">16</span>
+              <span class="deck-filename" id="deckFilename16">-- Empty --</span>
+              <button class="btn-queue" data-deck="16" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="16" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed16">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength16">00:00</span>
+              <span class="timer remaining" id="deckRemaining16">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress16"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="16" title="Play">▶</button>
+              <button class="btn-pause" data-deck="16" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="16" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="16" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio16" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="17">
+            <div class="deck-header">
+              <span class="deck-number">17</span>
+              <span class="deck-filename" id="deckFilename17">-- Empty --</span>
+              <button class="btn-queue" data-deck="17" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="17" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed17">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength17">00:00</span>
+              <span class="timer remaining" id="deckRemaining17">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress17"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="17" title="Play">▶</button>
+              <button class="btn-pause" data-deck="17" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="17" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="17" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio17" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="18">
+            <div class="deck-header">
+              <span class="deck-number">18</span>
+              <span class="deck-filename" id="deckFilename18">-- Empty --</span>
+              <button class="btn-queue" data-deck="18" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="18" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed18">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength18">00:00</span>
+              <span class="timer remaining" id="deckRemaining18">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress18"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="18" title="Play">▶</button>
+              <button class="btn-pause" data-deck="18" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="18" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="18" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio18" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="19">
+            <div class="deck-header">
+              <span class="deck-number">19</span>
+              <span class="deck-filename" id="deckFilename19">-- Empty --</span>
+              <button class="btn-queue" data-deck="19" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="19" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed19">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength19">00:00</span>
+              <span class="timer remaining" id="deckRemaining19">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress19"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="19" title="Play">▶</button>
+              <button class="btn-pause" data-deck="19" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="19" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="19" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio19" preload="metadata"></audio>
+          </div>
+
+          <div class="audio-deck" data-deck="20">
+            <div class="deck-header">
+              <span class="deck-number">20</span>
+              <span class="deck-filename" id="deckFilename20">-- Empty --</span>
+              <button class="btn-queue" data-deck="20" title="Queue after previous">Q</button>
+              <button class="btn-remove" data-deck="20" title="Remove">×</button>
+            </div>
+            <div class="deck-timers">
+              <span class="timer elapsed" id="deckElapsed20">00:00</span>
+              <span class="timer-separator">/</span>
+              <span class="timer length" id="deckLength20">00:00</span>
+              <span class="timer remaining" id="deckRemaining20">-00:00</span>
+            </div>
+            <div class="deck-progress"><div class="progress-bar" id="deckProgress20"></div></div>
+            <div class="deck-controls">
+              <button class="btn-play" data-deck="20" title="Play">▶</button>
+              <button class="btn-pause" data-deck="20" title="Pause">⏸</button>
+              <button class="btn-stop" data-deck="20" title="Stop">⏹</button>
+              <input type="range" class="deck-volume" data-deck="20" min="0" max="100" value="100" title="Volume">
+            </div>
+            <audio id="audio20" preload="metadata"></audio>
           </div>
         </div>
       </section>
@@ -177,7 +496,7 @@
       <section class="hot-buttons-panel">
         <h2>Hot Buttons</h2>
         <div class="hot-buttons-grid" id="hotButtonsGrid">
-          <!-- Hot buttons 1-10 -->
+          <!-- Hot buttons 1-20 -->
           <button class="hot-button" data-slot="1"><span class="hot-number">1</span><span class="hot-label">Empty</span></button>
           <button class="hot-button" data-slot="2"><span class="hot-number">2</span><span class="hot-label">Empty</span></button>
           <button class="hot-button" data-slot="3"><span class="hot-number">3</span><span class="hot-label">Empty</span></button>
@@ -188,6 +507,16 @@
           <button class="hot-button" data-slot="8"><span class="hot-number">8</span><span class="hot-label">Empty</span></button>
           <button class="hot-button" data-slot="9"><span class="hot-number">9</span><span class="hot-label">Empty</span></button>
           <button class="hot-button" data-slot="10"><span class="hot-number">10</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="11"><span class="hot-number">11</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="12"><span class="hot-number">12</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="13"><span class="hot-number">13</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="14"><span class="hot-number">14</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="15"><span class="hot-number">15</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="16"><span class="hot-number">16</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="17"><span class="hot-number">17</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="18"><span class="hot-number">18</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="19"><span class="hot-number">19</span><span class="hot-label">Empty</span></button>
+          <button class="hot-button" data-slot="20"><span class="hot-number">20</span><span class="hot-label">Empty</span></button>
         </div>
         <p class="hot-buttons-hint">Drag audio files to assign. Click to play. Right-click to clear.</p>
       </section>
@@ -195,28 +524,20 @@
       <!-- Right Panel - File Browser -->
       <section class="file-browser-panel">
         <h2>File Browser</h2>
-        
-        <!-- Master Folder Controls -->
         <div class="folder-controls">
           <button id="btnSetMasterFolder" class="btn-folder">Set Master Folder</button>
           <span id="masterFolderPath" class="folder-path">No folder selected</span>
         </div>
-
-        <!-- Subfolder Dropdown -->
         <div class="subfolder-selector">
           <label for="subfolderSelect">Folder:</label>
           <select id="subfolderSelect">
             <option value="">All Folders</option>
           </select>
         </div>
-
-        <!-- Search -->
         <div class="search-container">
           <input type="text" id="searchInput" placeholder="Search audio files..." class="search-input">
           <button id="btnSearch" class="btn-search">Search</button>
         </div>
-
-        <!-- File List -->
         <div class="file-list-container">
           <div class="file-list" id="fileList">
             <p class="file-list-empty">Select a master folder to browse audio files.</p>
@@ -234,9 +555,32 @@
 
   <!-- Context Menu (hidden) -->
   <div class="context-menu" id="contextMenu" style="display: none;">
-    <button class="context-item" data-action="load-deck">Load to Deck</button>
-    <button class="context-item" data-action="add-queue">Add to Queue</button>
-    <button class="context-item" data-action="assign-hot">Assign to Hot Button</button>
+    <button class="context-item" data-action="load-deck">Load to Deck...</button>
+    <button class="context-item" data-action="assign-hot">Assign to Hot Button...</button>
+  </div>
+
+  <!-- Deck Selection Submenu -->
+  <div class="deck-select-menu" id="deckSelectMenu" style="display: none;">
+    <button class="deck-select-item" data-deck="1">Deck 1</button>
+    <button class="deck-select-item" data-deck="2">Deck 2</button>
+    <button class="deck-select-item" data-deck="3">Deck 3</button>
+    <button class="deck-select-item" data-deck="4">Deck 4</button>
+    <button class="deck-select-item" data-deck="5">Deck 5</button>
+    <button class="deck-select-item" data-deck="6">Deck 6</button>
+    <button class="deck-select-item" data-deck="7">Deck 7</button>
+    <button class="deck-select-item" data-deck="8">Deck 8</button>
+    <button class="deck-select-item" data-deck="9">Deck 9</button>
+    <button class="deck-select-item" data-deck="10">Deck 10</button>
+    <button class="deck-select-item" data-deck="11">Deck 11</button>
+    <button class="deck-select-item" data-deck="12">Deck 12</button>
+    <button class="deck-select-item" data-deck="13">Deck 13</button>
+    <button class="deck-select-item" data-deck="14">Deck 14</button>
+    <button class="deck-select-item" data-deck="15">Deck 15</button>
+    <button class="deck-select-item" data-deck="16">Deck 16</button>
+    <button class="deck-select-item" data-deck="17">Deck 17</button>
+    <button class="deck-select-item" data-deck="18">Deck 18</button>
+    <button class="deck-select-item" data-deck="19">Deck 19</button>
+    <button class="deck-select-item" data-deck="20">Deck 20</button>
   </div>
 
   <script src="renderer.js"></script>
