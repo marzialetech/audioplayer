@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:; img-src 'self' file:">
-  <title>AudioPlayer by Pixamation</title>
+  <title>AudioPlayer by Pixamation - Professional Audio Playback</title>
+  <link rel="icon" type="image/png" href="assets/icon.png">
+  <link rel="apple-touch-icon" href="assets/icon.png">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <div class="app-container">
+  <div class="landing-container">
     <!-- Header -->
-    <header class="app-header">
+    <header class="landing-header">
       <div class="brand">
         <img src="assets/icon.png" alt="AudioPlayer" class="app-logo">
         <div class="brand-text">
@@ -18,227 +19,150 @@
           <img src="assets/pixamation-logo.png" alt="by Pixamation" class="pixamation-logo">
         </div>
       </div>
-      <div class="master-controls">
-        <label>Master Volume:</label>
-        <input type="range" id="masterVolume" min="0" max="100" value="100" class="master-volume-slider">
-        <span id="masterVolumeValue">100%</span>
-      </div>
     </header>
 
-    <!-- Main Content -->
-    <main class="main-content">
-      <!-- Left Panel - Audio Decks -->
-      <section class="audio-decks-panel">
-        <h2>Audio Decks</h2>
-        <div class="audio-decks" id="audioDecks">
-          <!-- Audio Deck 1 -->
-          <div class="audio-deck" data-deck="1">
-            <div class="deck-header">
-              <span class="deck-number">1</span>
-              <span class="deck-filename" id="deckFilename1">-- Empty --</span>
-              <button class="btn-remove" data-deck="1" title="Remove">×</button>
-            </div>
-            <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed1">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength1">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining1">00:00</span>
-              </div>
-            </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress1"></div>
-            </div>
-            <div class="deck-controls">
-              <button class="btn-play" data-deck="1" title="Play">▶</button>
-              <button class="btn-pause" data-deck="1" title="Pause">⏸</button>
-              <button class="btn-stop" data-deck="1" title="Stop">⏹</button>
-              <input type="range" class="deck-volume" data-deck="1" min="0" max="100" value="100" title="Volume">
-            </div>
-            <audio id="audio1" preload="metadata"></audio>
-          </div>
-
-          <!-- Audio Deck 2 -->
-          <div class="audio-deck" data-deck="2">
-            <div class="deck-header">
-              <span class="deck-number">2</span>
-              <span class="deck-filename" id="deckFilename2">-- Empty --</span>
-              <button class="btn-remove" data-deck="2" title="Remove">×</button>
-            </div>
-            <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed2">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength2">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining2">00:00</span>
-              </div>
-            </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress2"></div>
-            </div>
-            <div class="deck-controls">
-              <button class="btn-play" data-deck="2" title="Play">▶</button>
-              <button class="btn-pause" data-deck="2" title="Pause">⏸</button>
-              <button class="btn-stop" data-deck="2" title="Stop">⏹</button>
-              <input type="range" class="deck-volume" data-deck="2" min="0" max="100" value="100" title="Volume">
-            </div>
-            <audio id="audio2" preload="metadata"></audio>
-          </div>
-
-          <!-- Audio Deck 3 -->
-          <div class="audio-deck" data-deck="3">
-            <div class="deck-header">
-              <span class="deck-number">3</span>
-              <span class="deck-filename" id="deckFilename3">-- Empty --</span>
-              <button class="btn-remove" data-deck="3" title="Remove">×</button>
-            </div>
-            <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed3">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength3">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining3">00:00</span>
-              </div>
-            </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress3"></div>
-            </div>
-            <div class="deck-controls">
-              <button class="btn-play" data-deck="3" title="Play">▶</button>
-              <button class="btn-pause" data-deck="3" title="Pause">⏸</button>
-              <button class="btn-stop" data-deck="3" title="Stop">⏹</button>
-              <input type="range" class="deck-volume" data-deck="3" min="0" max="100" value="100" title="Volume">
-            </div>
-            <audio id="audio3" preload="metadata"></audio>
-          </div>
-
-          <!-- Audio Deck 4 -->
-          <div class="audio-deck" data-deck="4">
-            <div class="deck-header">
-              <span class="deck-number">4</span>
-              <span class="deck-filename" id="deckFilename4">-- Empty --</span>
-              <button class="btn-remove" data-deck="4" title="Remove">×</button>
-            </div>
-            <div class="deck-timers">
-              <div class="timer-group">
-                <span class="timer-label">Elapsed</span>
-                <span class="timer elapsed" id="deckElapsed4">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Length</span>
-                <span class="timer length" id="deckLength4">00:00</span>
-              </div>
-              <div class="timer-group">
-                <span class="timer-label">Remain</span>
-                <span class="timer remaining" id="deckRemaining4">00:00</span>
-              </div>
-            </div>
-            <div class="deck-progress">
-              <div class="progress-bar" id="deckProgress4"></div>
-            </div>
-            <div class="deck-controls">
-              <button class="btn-play" data-deck="4" title="Play">▶</button>
-              <button class="btn-pause" data-deck="4" title="Pause">⏸</button>
-              <button class="btn-stop" data-deck="4" title="Stop">⏹</button>
-              <input type="range" class="deck-volume" data-deck="4" min="0" max="100" value="100" title="Volume">
-            </div>
-            <audio id="audio4" preload="metadata"></audio>
-          </div>
-        </div>
-
-        <!-- Queue Section -->
-        <div class="queue-section">
-          <h3>Queue</h3>
-          <div class="queue-list" id="queueList">
-            <p class="queue-empty">Queue is empty. Drag files here or use the Queue button.</p>
-          </div>
-        </div>
-      </section>
-
-      <!-- Center Panel - Hot Buttons -->
-      <section class="hot-buttons-panel">
-        <h2>Hot Buttons</h2>
-        <div class="hot-buttons-grid" id="hotButtonsGrid">
-          <!-- Hot buttons 1-10 -->
-          <button class="hot-button" data-slot="1"><span class="hot-number">1</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="2"><span class="hot-number">2</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="3"><span class="hot-number">3</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="4"><span class="hot-number">4</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="5"><span class="hot-number">5</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="6"><span class="hot-number">6</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="7"><span class="hot-number">7</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="8"><span class="hot-number">8</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="9"><span class="hot-number">9</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="10"><span class="hot-number">10</span><span class="hot-label">Empty</span></button>
-        </div>
-        <p class="hot-buttons-hint">Drag audio files to assign. Click to play. Right-click to clear.</p>
-      </section>
-
-      <!-- Right Panel - File Browser -->
-      <section class="file-browser-panel">
-        <h2>File Browser</h2>
+    <!-- Hero Section -->
+    <section class="hero">
+      <div class="hero-content">
+        <h2>Professional Audio Playback</h2>
+        <p class="tagline">WaveCart-style audio player for radio broadcasting, live events, and audio management</p>
         
-        <!-- Master Folder Controls -->
-        <div class="folder-controls">
-          <button id="btnSetMasterFolder" class="btn-folder">Set Master Folder</button>
-          <span id="masterFolderPath" class="folder-path">No folder selected</span>
-        </div>
-
-        <!-- Subfolder Dropdown -->
-        <div class="subfolder-selector">
-          <label for="subfolderSelect">Folder:</label>
-          <select id="subfolderSelect">
-            <option value="">All Folders</option>
-          </select>
-        </div>
-
-        <!-- Search -->
-        <div class="search-container">
-          <input type="text" id="searchInput" placeholder="Search audio files..." class="search-input">
-          <button id="btnSearch" class="btn-search">Search</button>
-        </div>
-
-        <!-- File List -->
-        <div class="file-list-container">
-          <div class="file-list" id="fileList">
-            <p class="file-list-empty">Select a master folder to browse audio files.</p>
+        <div class="features-grid">
+          <div class="feature">
+            <span class="feature-icon">🎛️</span>
+            <span class="feature-text">4 Simultaneous Decks</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">⚡</span>
+            <span class="feature-text">10 Hot Buttons</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">📋</span>
+            <span class="feature-text">Queue System</span>
+          </div>
+          <div class="feature">
+            <span class="feature-icon">🔊</span>
+            <span class="feature-text">Volume Control</span>
           </div>
         </div>
-      </section>
-    </main>
+      </div>
+    </section>
 
-    <!-- Status Bar -->
-    <footer class="status-bar">
-      <span id="statusMessage">Ready</span>
-      <span id="statusTime"></span>
+    <!-- Download Section -->
+    <section class="download-section">
+      <h3>Choose Your Platform</h3>
+      
+      <div class="download-options">
+        <!-- Web App -->
+        <div class="download-card webapp">
+          <div class="card-icon">🌐</div>
+          <h4>Web App</h4>
+          <p>Use directly in your browser. No installation required.</p>
+          <a href="webapp/" class="btn btn-primary btn-large">
+            <span class="btn-icon">▶</span>
+            Launch Web App
+          </a>
+          <span class="platform-note">Works on any device with a modern browser</span>
+        </div>
+
+        <!-- macOS -->
+        <div class="download-card macos">
+          <div class="card-icon">🍎</div>
+          <h4>macOS</h4>
+          <p>Native desktop app with full system integration.</p>
+          <a href="macos/AudioPlayer by Pixamation-1.0.0-arm64.dmg" class="btn btn-secondary btn-large" download>
+            <span class="btn-icon">⬇</span>
+            Download for Mac
+          </a>
+          <span class="platform-note">macOS 10.13+ (Apple Silicon)</span>
+        </div>
+
+        <!-- Windows -->
+        <div class="download-card windows">
+          <div class="card-icon">🪟</div>
+          <h4>Windows</h4>
+          <p>Native desktop app for Windows PC.</p>
+          <a href="windows/AudioPlayer by Pixamation Setup 1.0.0.exe" class="btn btn-secondary btn-large" download>
+            <span class="btn-icon">⬇</span>
+            Download for Windows
+          </a>
+          <span class="platform-note">Windows 10/11 (ARM64)</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Features Section -->
+    <section class="features-section">
+      <h3>Designed for Live Audio</h3>
+      
+      <div class="features-list">
+        <div class="feature-item">
+          <div class="feature-header">
+            <span class="feature-number">01</span>
+            <h4>Multiple Audio Decks</h4>
+          </div>
+          <p>Play up to 4 audio files simultaneously with individual controls for each deck. Perfect for layering audio, transitions, and live mixing.</p>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-header">
+            <span class="feature-number">02</span>
+            <h4>Instant Hot Buttons</h4>
+          </div>
+          <p>Assign your most-used sounds to 10 hot buttons for instant playback. Trigger with a click or keyboard shortcuts (F1-F10).</p>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-header">
+            <span class="feature-number">03</span>
+            <h4>Smart Queue System</h4>
+          </div>
+          <p>Line up audio files in a queue for automatic playback. When one track ends, the next loads automatically to keep the show running.</p>
+        </div>
+
+        <div class="feature-item">
+          <div class="feature-header">
+            <span class="feature-number">04</span>
+            <h4>Drag & Drop Everything</h4>
+          </div>
+          <p>Intuitive drag and drop interface. Load files to decks, assign to hot buttons, or add to queue with simple drag operations.</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- Keyboard Shortcuts -->
+    <section class="shortcuts-section">
+      <h3>Keyboard Shortcuts</h3>
+      <div class="shortcuts-grid">
+        <div class="shortcut">
+          <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd><kbd>4</kbd>
+          <span>Play Decks 1-4</span>
+        </div>
+        <div class="shortcut">
+          <kbd>Shift</kbd>+<kbd>1-4</kbd>
+          <span>Stop Decks 1-4</span>
+        </div>
+        <div class="shortcut">
+          <kbd>F1</kbd>-<kbd>F10</kbd>
+          <span>Hot Buttons</span>
+        </div>
+        <div class="shortcut">
+          <kbd>Space</kbd>
+          <span>Play/Pause Deck 1</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="landing-footer">
+      <div class="footer-brand">
+        <img src="assets/pixamation-logo.png" alt="Pixamation" class="footer-logo">
+      </div>
+      <p>&copy; 2026 Pixamation Inc. All rights reserved.</p>
+      <p class="footer-links">
+        <a href="https://github.com/marzialetech/audioplayer" target="_blank">GitHub</a>
+      </p>
     </footer>
   </div>
-
-  <!-- Context Menu (hidden) -->
-  <div class="context-menu" id="contextMenu" style="display: none;">
-    <button class="context-item" data-action="load-deck">Load to Deck</button>
-    <button class="context-item" data-action="add-queue">Add to Queue</button>
-    <button class="context-item" data-action="assign-hot">Assign to Hot Button</button>
-  </div>
-
-  <script src="renderer.js"></script>
 </body>
 </html>

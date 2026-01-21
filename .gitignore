@@ -1,9 +1,14 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Desktop source build outputs (use desktop-src/dist for builds)
+desktop-src/dist/
+desktop-src/node_modules/
 out/
+
+# Note: macos/ and windows/ folders contain distributable binaries
+# These are intentionally tracked for deployment to bitmapped.com/player
+# Consider using Git LFS for large binary files
 
 # Logs
 *.log

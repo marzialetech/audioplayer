@@ -8,78 +8,71 @@
   <strong>Professional audio playback application for radio broadcasting and live audio management</strong>
 </p>
 
+<p align="center">
+  <a href="webapp/">Web App</a> •
+  <a href="macos/">Download for macOS</a> •
+  <a href="windows/">Download for Windows</a>
+</p>
+
 ---
+
+## Project Structure
+
+```
+player/
+├── index.html          # Landing page (bitmapped.com/player)
+├── styles.css          # Landing page styles
+├── assets/             # Landing page assets
+│
+├── webapp/             # Browser-based web application
+│   ├── index.html
+│   ├── styles.css
+│   ├── app.js
+│   └── assets/
+│
+├── macos/              # macOS downloads
+│   ├── AudioPlayer by Pixamation-1.0.0-arm64.dmg
+│   └── AudioPlayer by Pixamation-1.0.0-arm64-mac.zip
+│
+├── windows/            # Windows downloads
+│   └── AudioPlayer by Pixamation Setup 1.0.0.exe
+│
+└── desktop-src/        # Desktop app source code
+    ├── package.json
+    ├── main.js
+    └── ...
+```
+
+## Platforms
+
+### Web App
+Use AudioPlayer directly in your browser with no installation required.
+- Works on any device with a modern browser
+- Drag & drop audio files to add them
+- Files stored in browser session
+
+### macOS Desktop
+Native Electron app for macOS.
+- Full file system access
+- Persistent settings and hot buttons
+- System menu integration
+
+### Windows Desktop
+Native Electron app for Windows.
+- Full file system access
+- Persistent settings and hot buttons
+- System tray integration
 
 ## Features
 
-### Audio Playback
-- Support for **WAV** and **MP3** audio files (plus OGG, FLAC, AAC, M4A)
-- **4 simultaneous audio decks** for parallel playback
-- Individual play, pause, and stop controls per deck
-- Real-time countdown timer and elapsed time display
-- Progress bar visualization
-
-### Audio Management
-- **10 hot buttons** for instant audio access (keyboard shortcuts F1-F10)
-- **Queue system** for playlist management
-- Drag-and-drop support for loading audio to decks, hot buttons, and queue
-- Configurable **master folder** with subfolder navigation
-- **Search functionality** to quickly locate audio files
-
-### User Interface
-- **Master volume control** affecting all decks
-- **Per-deck volume faders** for individual level control
-- Real-time countdown/remaining time display
-- Modern dark theme inspired by professional broadcasting software
-- Status bar with current time and activity messages
-
-## Installation
-
-### Prerequisites
-- [Node.js](https://nodejs.org/) (v16 or higher)
-- npm (comes with Node.js)
-
-### Setup
-
-1. Clone the repository:
-```bash
-git clone https://github.com/marzialetech/audioplayer.git
-cd audioplayer
-```
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-3. Run the application:
-```bash
-npm start
-```
-
-### Development Mode
-```bash
-npm run dev
-```
-
-## Building for Distribution
-
-### macOS
-```bash
-npm run build:mac
-```
-
-### Windows
-```bash
-npm run build:win
-```
-
-### Linux
-```bash
-npm run build:linux
-```
-
-Built applications will be in the `dist/` folder.
+- **4 Simultaneous Audio Decks** - Play multiple audio files at once
+- **10 Hot Buttons** - Instant access to frequently used sounds
+- **Queue System** - Automatic playback of queued items
+- **Drag & Drop** - Intuitive file management
+- **Volume Controls** - Master and per-deck volume faders
+- **Real-time Timers** - Elapsed, remaining, and total time display
+- **Search** - Find audio files quickly
+- **Keyboard Shortcuts** - Fast control during live use
 
 ## Keyboard Shortcuts
 
@@ -89,98 +82,39 @@ Built applications will be in the `dist/` folder.
 | `Shift + 1-4` | Stop deck 1-4 |
 | `F1-F10` | Play hot button 1-10 |
 | `Space` | Toggle play/pause on deck 1 |
-| `Ctrl/Cmd + O` | Set master folder |
-| `Ctrl/Cmd + Q` | Quit application |
 
-## Usage Guide
+## Building from Source
 
-### Setting Up Your Audio Library
+```bash
+cd desktop-src
+npm install
 
-1. Click **Set Master Folder** or use `Ctrl/Cmd + O`
-2. Select the root folder containing your audio files
-3. Use the **Folder dropdown** to navigate between subfolders
-4. Use the **Search box** to find specific audio files
+# Build for macOS
+npm run build:mac
 
-### Loading Audio
+# Build for Windows
+npm run build:win
 
-- **Double-click** a file to load it to the first available deck
-- **Drag and drop** files onto decks, hot buttons, or the queue
-- **Right-click** for context menu options
-
-### Hot Buttons
-
-- **Drag** an audio file to a hot button to assign it
-- **Click** a hot button to play its assigned audio
-- **Right-click** a hot button to clear its assignment
-- Press **F1-F10** to quickly trigger hot buttons
-
-### Queue
-
-- Drag files to the queue area to add them
-- **Double-click** a queue item to load it immediately
-- Queue items automatically load to decks when the current audio ends
-
-## File Structure
-
-```
-audioplayer/
-├── main.js          # Electron main process
-├── preload.js       # Secure IPC bridge
-├── index.html       # Main application UI
-├── styles.css       # Application styling
-├── renderer.js      # UI logic and audio control
-├── package.json     # Dependencies and scripts
-└── assets/          # Application icons
+# Build for Linux
+npm run build:linux
 ```
 
-## Configuration
+## Deployment
 
-Settings are automatically saved and restored:
-- Master folder location
-- Hot button assignments
-- Queue contents
+To deploy to bitmapped.com/player:
 
-Settings are stored using `electron-store` in the user's app data directory.
-
-## Supported Audio Formats
-
-| Format | Extension |
-|--------|-----------|
-| WAV | `.wav` |
-| MP3 | `.mp3` |
-| OGG | `.ogg` |
-| FLAC | `.flac` |
-| AAC | `.aac` |
-| M4A | `.m4a` |
-
-## Troubleshooting
-
-### Audio won't play
-- Ensure the audio file format is supported
-- Check that the file path doesn't contain special characters
-- Verify the audio file isn't corrupted
-
-### Application won't start
-- Ensure Node.js v16+ is installed
-- Run `npm install` to ensure all dependencies are present
-- Check the console for error messages with `npm run dev`
+1. Upload the entire `player/` folder contents to the web server
+2. The landing page will be at `/player/`
+3. Web app will be at `/player/webapp/`
+4. Downloads will be available from `/player/macos/` and `/player/windows/`
 
 ## License
 
 MIT License - See [LICENSE](LICENSE) file for details.
 
-## Author
-
-Developed by **Pixamation**
-
-- GitHub: [marzialetech](https://github.com/marzialetech)
-
-## Acknowledgments
-
-Inspired by WaveCart and similar professional broadcasting software used in radio stations worldwide.
-
 ---
 
 <p align="center">
-  <sub>AudioPlayer by Pixamation - Making audio management simple and powerful</sub>
+  <strong>AudioPlayer by Pixamation</strong><br>
+  Making audio management simple and powerful
 </p>
