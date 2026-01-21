@@ -1,8 +1,14 @@
-# AudioPlayer
+# AudioPlayer by Pixamation
 
-A WaveCart-style audio playback application designed for radio broadcasting and live audio management.
+<p align="center">
+  <img src="assets/icon.png" alt="AudioPlayer by Pixamation" width="128" height="128">
+</p>
 
-![AudioPlayer Screenshot](assets/screenshot.png)
+<p align="center">
+  <strong>Professional audio playback application for radio broadcasting and live audio management</strong>
+</p>
+
+---
 
 ## Features
 
@@ -165,8 +171,16 @@ MIT License - See [LICENSE](LICENSE) file for details.
 
 ## Author
 
-Created by [marzialetech](https://github.com/marzialetech)
+Developed by **Pixamation**
+
+- GitHub: [marzialetech](https://github.com/marzialetech)
 
 ## Acknowledgments
 
 Inspired by WaveCart and similar professional broadcasting software used in radio stations worldwide.
+
+---
+
+<p align="center">
+  <sub>AudioPlayer by Pixamation - Making audio management simple and powerful</sub>
+</p>

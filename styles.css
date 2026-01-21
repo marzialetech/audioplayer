@@ -44,10 +44,42 @@ body {
   border-bottom: 2px solid var(--accent-blue);
 }
 
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.app-logo {
+  width: 48px;
+  height: 48px;
+  border-radius: 10px;
+  box-shadow: 0 0 15px rgba(0, 217, 255, 0.4);
+  transition: transform 0.3s, box-shadow 0.3s;
+}
+
+.app-logo:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 25px rgba(0, 217, 255, 0.6);
+}
+
+.brand-text {
+  display: flex;
+  flex-direction: column;
+}
+
 .app-header h1 {
   font-size: 24px;
   color: var(--accent-blue);
   text-shadow: 0 0 10px rgba(0, 217, 255, 0.5);
+  line-height: 1.2;
+}
+
+.brand-subtitle {
+  font-size: 12px;
+  color: var(--accent-green);
+  letter-spacing: 1px;
+  text-transform: uppercase;
 }
 
 .master-controls {

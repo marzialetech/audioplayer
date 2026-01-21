@@ -1,7 +1,7 @@
 {
-  "name": "audioplayer",
+  "name": "audioplayer-by-pixamation",
   "version": "1.0.0",
-  "description": "WaveCart-style audio playback application for radio broadcasting and live audio management",
+  "description": "AudioPlayer by Pixamation - Professional audio playback application for radio broadcasting and live audio management",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -17,9 +17,10 @@
     "wavecart",
     "radio",
     "broadcasting",
-    "cart-machine"
+    "cart-machine",
+    "pixamation"
   ],
-  "author": "marzialetech",
+  "author": "Pixamation",
   "license": "MIT",
   "dependencies": {
     "electron-store": "^8.1.0"
@@ -29,8 +30,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.marzialetech.audioplayer",
-    "productName": "AudioPlayer",
+    "appId": "com.pixamation.audioplayer",
+    "productName": "AudioPlayer by Pixamation",
     "directories": {
       "output": "dist"
     },

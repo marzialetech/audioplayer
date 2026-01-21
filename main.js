@@ -19,7 +19,7 @@ function createWindow() {
       nodeIntegration: false
     },
     icon: path.join(__dirname, 'assets', 'icon.png'),
-    title: 'AudioPlayer - WaveCart Style'
+    title: 'AudioPlayer by Pixamation'
   });
 
   mainWindow.loadFile('index.html');
@@ -82,9 +82,10 @@ function createWindow() {
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About AudioPlayer',
-              message: 'AudioPlayer v1.0.0',
-              detail: 'A WaveCart-style audio playback application for radio broadcasting and live audio management.\n\nBy marzialetech'
+              title: 'About AudioPlayer by Pixamation',
+              message: 'AudioPlayer by Pixamation v1.0.0',
+              detail: 'Professional audio playback application for radio broadcasting and live audio management.\n\nDeveloped by Pixamation\nhttps://pixamation.com',
+              icon: path.join(__dirname, 'assets', 'icon.png')
             });
           }
         }
