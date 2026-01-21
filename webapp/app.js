@@ -21,7 +21,8 @@ const state = {
   decks: {},
   selectedFile: null,
   masterVolume: 1,
-  searchQuery: ''
+  searchQuery: '',
+  draggingFile: null // Store file being dragged (handles can't be serialized)
 };
 
 // Initialize decks 1-20
@@ -200,10 +201,9 @@ function setupEventListeners() {
     btn.addEventListener('drop', (e) => {
       e.preventDefault();
       btn.classList.remove('drag-over');
-      const fileData = e.dataTransfer.getData('application/json');
-      if (fileData) {
-        const file = JSON.parse(fileData);
-        loadToDeck(btn.dataset.slot, file);
+      // Use the stored dragging file (handles can't be serialized to JSON)
+      if (state.draggingFile) {
+        loadToDeck(btn.dataset.slot, state.draggingFile);
       }
     });
   });
@@ -222,10 +222,9 @@ function setupEventListeners() {
     deck.addEventListener('drop', (e) => {
       e.preventDefault();
       deck.classList.remove('drag-over');
-      const fileData = e.dataTransfer.getData('application/json');
-      if (fileData) {
-        const file = JSON.parse(fileData);
-        loadToDeck(deck.dataset.deck, file);
+      // Use the stored dragging file (handles can't be serialized to JSON)
+      if (state.draggingFile) {
+        loadToDeck(deck.dataset.deck, state.draggingFile);
       }
     });
   });
@@ -392,18 +391,17 @@ function renderFileList() {
       div.addEventListener('dblclick', () => loadToFirstEmptyDeck(item));
       
       div.addEventListener('dragstart', (e) => {
-        e.dataTransfer.setData('application/json', JSON.stringify({
-          name: item.name,
-          handle: null // Can't serialize handle, will get fresh one on drop
-        }));
-        e.dataTransfer.setData('text/filename', item.name);
-        // Store reference for same-page drag
-        div._fileItem = item;
+        // Store file in state (handles can't be serialized to JSON)
+        state.draggingFile = item;
+        e.dataTransfer.setData('text/plain', item.name);
+        e.dataTransfer.effectAllowed = 'copy';
         div.classList.add('dragging');
       });
       
       div.addEventListener('dragend', () => {
         div.classList.remove('dragging');
+        // Clear after a short delay to allow drop to complete
+        setTimeout(() => { state.draggingFile = null; }, 100);
       });
       
       div.addEventListener('contextmenu', (e) => {
