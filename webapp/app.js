@@ -5,17 +5,26 @@
 
 // Constants
 const DECK_COUNT = 20;
+const DIR_SLOT_COUNT = 4;
 
 // State Management
 const state = {
-  audioLibrary: [], // Array of {name, file, url}
+  directorySlots: {
+    1: { handle: null, path: '', files: [] },
+    2: { handle: null, path: '', files: [] },
+    3: { handle: null, path: '', files: [] },
+    4: { handle: null, path: '', files: [] }
+  },
+  activeDirectorySlot: 1,
+  currentPath: [], // Breadcrumb for navigation within directory
+  currentFiles: [], // Files in current view
   decks: {},
   selectedFile: null,
   masterVolume: 1,
   searchQuery: ''
 };
 
-// Initialize decks 1-10
+// Initialize decks 1-20
 for (let i = 1; i <= DECK_COUNT; i++) {
   state.decks[i] = { audio: null, file: null, playing: false, queued: false };
 }
@@ -24,9 +33,6 @@ for (let i = 1; i <= DECK_COUNT; i++) {
 const elements = {
   masterVolume: document.getElementById('masterVolume'),
   masterVolumeValue: document.getElementById('masterVolumeValue'),
-  btnAddFiles: document.getElementById('btnAddFiles'),
-  btnClearLibrary: document.getElementById('btnClearLibrary'),
-  fileInput: document.getElementById('fileInput'),
   searchInput: document.getElementById('searchInput'),
   btnSearch: document.getElementById('btnSearch'),
   fileList: document.getElementById('fileList'),
@@ -35,7 +41,8 @@ const elements = {
   deckSelectMenu: document.getElementById('deckSelectMenu'),
   dropOverlay: document.getElementById('dropOverlay'),
   statusMessage: document.getElementById('statusMessage'),
-  statusTime: document.getElementById('statusTime')
+  statusTime: document.getElementById('statusTime'),
+  currentPathDisplay: document.getElementById('currentPathDisplay')
 };
 
 // Initialize Application
@@ -48,9 +55,6 @@ function init() {
     setupDeckAudio(i);
   }
   
-  // Load saved settings from localStorage
-  loadSettings();
-  
   // Setup event listeners
   setupEventListeners();
   
@@ -58,29 +62,7 @@ function init() {
   updateStatusTime();
   setInterval(updateStatusTime, 1000);
   
-  setStatus('Ready - Add audio files to get started');
-}
-
-// Load saved settings from localStorage
-function loadSettings() {
-  try {
-    // Hot buttons can't fully persist in web version (no file access)
-    // But we can show the names
-    const hotButtons = localStorage.getItem('audioPlayerHotButtons');
-    if (hotButtons) {
-      const data = JSON.parse(hotButtons);
-      // Just update display with names (files need to be re-added)
-      for (const [slot, info] of Object.entries(data)) {
-        if (info && info.name) {
-          const button = document.querySelector(`.hot-button[data-slot="${slot}"]`);
-          const label = button.querySelector('.hot-label');
-          label.textContent = info.name.replace(/\.[^/.]+$/, '') + ' (reload)';
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error loading settings:', error);
-  }
+  setStatus('Ready - Select a directory to browse audio files');
 }
 
 // Setup audio deck
@@ -121,19 +103,20 @@ function setupEventListeners() {
     updateAllDeckVolumes();
   });
   
-  // Add files button
-  elements.btnAddFiles.addEventListener('click', () => {
-    elements.fileInput.click();
+  // Directory slot buttons
+  document.querySelectorAll('.btn-select-dir').forEach(btn => {
+    btn.addEventListener('click', () => selectDirectory(parseInt(btn.dataset.slot)));
   });
   
-  // File input change
-  elements.fileInput.addEventListener('change', (e) => {
-    handleFileSelect(e.target.files);
-    e.target.value = ''; // Reset for re-selection
+  // Directory slot switching (click on the slot container)
+  document.querySelectorAll('.directory-slot').forEach(slot => {
+    slot.addEventListener('click', (e) => {
+      // Don't switch if clicking the button itself
+      if (e.target.classList.contains('btn-select-dir')) return;
+      const slotNum = parseInt(slot.dataset.slot);
+      switchToDirectorySlot(slotNum);
+    });
   });
-  
-  // Clear library button
-  elements.btnClearLibrary.addEventListener('click', clearLibrary);
   
   // Search
   elements.btnSearch.addEventListener('click', performSearch);
@@ -217,13 +200,10 @@ function setupEventListeners() {
     btn.addEventListener('drop', (e) => {
       e.preventDefault();
       btn.classList.remove('drag-over');
-      const fileIndex = e.dataTransfer.getData('text/fileindex');
-      if (fileIndex !== '') {
-        const file = state.audioLibrary[parseInt(fileIndex)];
-        if (file) {
-          // Load to both hot button and corresponding deck
-          loadToDeck(btn.dataset.slot, file);
-        }
+      const fileData = e.dataTransfer.getData('application/json');
+      if (fileData) {
+        const file = JSON.parse(fileData);
+        loadToDeck(btn.dataset.slot, file);
       }
     });
   });
@@ -242,37 +222,12 @@ function setupEventListeners() {
     deck.addEventListener('drop', (e) => {
       e.preventDefault();
       deck.classList.remove('drag-over');
-      const fileIndex = e.dataTransfer.getData('text/fileindex');
-      if (fileIndex !== '') {
-        const file = state.audioLibrary[parseInt(fileIndex)];
-        if (file) {
-          loadToDeck(deck.dataset.deck, file);
-        }
+      const fileData = e.dataTransfer.getData('application/json');
+      if (fileData) {
+        const file = JSON.parse(fileData);
+        loadToDeck(deck.dataset.deck, file);
       }
     });
-  });
-  
-  // Global drag and drop for adding files
-  document.addEventListener('dragover', (e) => {
-    e.preventDefault();
-    if (e.dataTransfer.types.includes('Files')) {
-      elements.dropOverlay.classList.add('active');
-    }
-  });
-  
-  document.addEventListener('dragleave', (e) => {
-    if (e.relatedTarget === null) {
-      elements.dropOverlay.classList.remove('active');
-    }
-  });
-  
-  document.addEventListener('drop', (e) => {
-    e.preventDefault();
-    elements.dropOverlay.classList.remove('active');
-    
-    if (e.dataTransfer.files.length > 0) {
-      handleFileSelect(e.dataTransfer.files);
-    }
   });
   
   // Context menu
@@ -285,95 +240,200 @@ function setupEventListeners() {
   document.addEventListener('keydown', handleKeyboard);
 }
 
-// Handle file selection
-function handleFileSelect(files) {
-  const audioFiles = Array.from(files).filter(file => 
-    file.type.startsWith('audio/') || 
-    /\.(mp3|wav|ogg|flac|aac|m4a)$/i.test(file.name)
-  );
-  
-  if (audioFiles.length === 0) {
-    setStatus('No audio files found in selection');
-    return;
-  }
-  
-  audioFiles.forEach(file => {
-    const url = URL.createObjectURL(file);
-    state.audioLibrary.push({
-      name: file.name,
-      file: file,
-      url: url
+// Select directory for a slot
+async function selectDirectory(slotNum) {
+  try {
+    // Check if File System Access API is supported
+    if (!('showDirectoryPicker' in window)) {
+      setStatus('Directory selection not supported in this browser. Try Chrome or Edge.');
+      return;
+    }
+    
+    const dirHandle = await window.showDirectoryPicker({
+      mode: 'read'
     });
-  });
-  
-  renderFileList();
-  setStatus(`Added ${audioFiles.length} audio file(s)`);
+    
+    state.directorySlots[slotNum].handle = dirHandle;
+    state.directorySlots[slotNum].path = dirHandle.name;
+    
+    // Update UI
+    document.getElementById(`dirPath${slotNum}`).textContent = dirHandle.name;
+    
+    // Switch to this slot and load contents
+    switchToDirectorySlot(slotNum);
+    
+    setStatus(`Directory ${slotNum} set: ${dirHandle.name}`);
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      console.error('Error selecting directory:', err);
+      setStatus('Error selecting directory');
+    }
+  }
 }
 
-// Clear library
-function clearLibrary() {
-  // Revoke all object URLs
-  state.audioLibrary.forEach(item => {
-    URL.revokeObjectURL(item.url);
+// Switch to a directory slot
+function switchToDirectorySlot(slotNum) {
+  // Update active state
+  document.querySelectorAll('.directory-slot').forEach(slot => {
+    slot.classList.remove('active');
   });
+  document.querySelector(`.directory-slot[data-slot="${slotNum}"]`).classList.add('active');
   
-  state.audioLibrary = [];
+  state.activeDirectorySlot = slotNum;
+  state.currentPath = [];
   
-  // Clear all decks
-  for (let i = 1; i <= DECK_COUNT; i++) {
-    clearDeck(i);
+  const slot = state.directorySlots[slotNum];
+  if (slot.handle) {
+    loadDirectoryContents(slot.handle);
+    elements.currentPathDisplay.textContent = slot.path;
+  } else {
+    elements.fileList.innerHTML = '<p class="file-list-empty">Click the button to select a directory.</p>';
+    elements.currentPathDisplay.textContent = 'No directory selected';
   }
-  
-  renderFileList();
-  setStatus('Library cleared');
+}
+
+// Load directory contents
+async function loadDirectoryContents(dirHandle, subPath = []) {
+  try {
+    setStatus('Loading directory...');
+    
+    const folders = [];
+    const files = [];
+    
+    // Navigate to subpath if needed
+    let currentHandle = dirHandle;
+    for (const folder of subPath) {
+      currentHandle = await currentHandle.getDirectoryHandle(folder);
+    }
+    
+    // Read directory contents
+    for await (const entry of currentHandle.values()) {
+      if (entry.kind === 'directory') {
+        folders.push({
+          name: entry.name,
+          type: 'folder',
+          handle: entry
+        });
+      } else if (entry.kind === 'file') {
+        // Check if it's an audio file
+        const ext = entry.name.split('.').pop().toLowerCase();
+        if (['mp3', 'wav', 'ogg', 'flac', 'aac', 'm4a', 'wma'].includes(ext)) {
+          files.push({
+            name: entry.name,
+            type: 'file',
+            handle: entry
+          });
+        }
+      }
+    }
+    
+    // Sort alphabetically
+    folders.sort((a, b) => a.name.localeCompare(b.name));
+    files.sort((a, b) => a.name.localeCompare(b.name));
+    
+    state.currentFiles = [...folders, ...files];
+    state.currentPath = subPath;
+    
+    // Update path display
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    const fullPath = [slot.path, ...subPath].join(' / ');
+    elements.currentPathDisplay.textContent = fullPath;
+    
+    renderFileList();
+    setStatus(`Loaded ${files.length} audio files, ${folders.length} folders`);
+  } catch (err) {
+    console.error('Error loading directory:', err);
+    setStatus('Error loading directory');
+  }
 }
 
 // Render file list
 function renderFileList() {
   elements.fileList.innerHTML = '';
   
-  let files = state.audioLibrary;
+  let items = state.currentFiles;
   
   // Apply search filter
   if (state.searchQuery) {
-    files = files.filter(f => 
+    items = items.filter(f => 
       f.name.toLowerCase().includes(state.searchQuery.toLowerCase())
     );
   }
   
-  if (files.length === 0) {
+  // Add parent folder navigation if in subfolder
+  if (state.currentPath.length > 0) {
+    const parentItem = document.createElement('div');
+    parentItem.className = 'file-item folder-item';
+    parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">..</span>`;
+    parentItem.addEventListener('click', () => navigateUp());
+    elements.fileList.appendChild(parentItem);
+  }
+  
+  if (items.length === 0 && state.currentPath.length === 0) {
     elements.fileList.innerHTML = state.searchQuery 
       ? '<p class="file-list-empty">No files match your search.</p>'
-      : '<p class="file-list-empty">Add audio files to get started.</p>';
+      : '<p class="file-list-empty">Select a directory to browse audio files.</p>';
     return;
   }
   
-  files.forEach((file, index) => {
-    const actualIndex = state.audioLibrary.indexOf(file);
-    const item = document.createElement('div');
-    item.className = 'file-item';
-    item.draggable = true;
-    item.innerHTML = `<span class="file-icon">🎵</span><span class="file-name">${file.name}</span>`;
+  items.forEach((item) => {
+    const div = document.createElement('div');
+    div.className = item.type === 'folder' ? 'file-item folder-item' : 'file-item';
+    div.draggable = item.type === 'file';
     
-    item.addEventListener('click', () => selectFile(item, file));
-    item.addEventListener('dblclick', () => loadToFirstEmptyDeck(file));
+    const icon = item.type === 'folder' ? '📁' : '🎵';
+    div.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${item.name}</span>`;
     
-    item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/fileindex', actualIndex.toString());
-      item.classList.add('dragging');
-    });
+    if (item.type === 'folder') {
+      div.addEventListener('click', () => navigateToFolder(item.name));
+      div.addEventListener('dblclick', () => navigateToFolder(item.name));
+    } else {
+      div.addEventListener('click', () => selectFile(div, item));
+      div.addEventListener('dblclick', () => loadToFirstEmptyDeck(item));
+      
+      div.addEventListener('dragstart', (e) => {
+        e.dataTransfer.setData('application/json', JSON.stringify({
+          name: item.name,
+          handle: null // Can't serialize handle, will get fresh one on drop
+        }));
+        e.dataTransfer.setData('text/filename', item.name);
+        // Store reference for same-page drag
+        div._fileItem = item;
+        div.classList.add('dragging');
+      });
+      
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+      });
+      
+      div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showContextMenu(e, item);
+      });
+    }
     
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-    });
-    
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showContextMenu(e, file);
-    });
-    
-    elements.fileList.appendChild(item);
+    elements.fileList.appendChild(div);
   });
+}
+
+// Navigate to a subfolder
+function navigateToFolder(folderName) {
+  const newPath = [...state.currentPath, folderName];
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  if (slot.handle) {
+    loadDirectoryContents(slot.handle, newPath);
+  }
+}
+
+// Navigate up one level
+function navigateUp() {
+  if (state.currentPath.length > 0) {
+    const newPath = state.currentPath.slice(0, -1);
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    if (slot.handle) {
+      loadDirectoryContents(slot.handle, newPath);
+    }
+  }
 }
 
 // Select file
@@ -426,30 +486,43 @@ function performSearch() {
   renderFileList();
   
   if (state.searchQuery) {
-    const count = state.audioLibrary.filter(f => 
+    const count = state.currentFiles.filter(f => 
       f.name.toLowerCase().includes(state.searchQuery.toLowerCase())
     ).length;
-    setStatus(`Found ${count} file(s) matching "${state.searchQuery}"`);
+    setStatus(`Found ${count} item(s) matching "${state.searchQuery}"`);
   }
 }
 
 // Load to deck (and sync with hot button)
-function loadToDeck(deckNum, file) {
+async function loadToDeck(deckNum, file) {
   deckNum = parseInt(deckNum);
-  const audio = state.decks[deckNum].audio;
-  audio.src = file.url;
-  state.decks[deckNum].file = file;
   
-  document.getElementById(`deckFilename${deckNum}`).textContent = file.name;
-  updateDeckState(deckNum, 'loaded');
-  
-  // Sync with hot button display
-  updateHotButtonDisplay(deckNum);
-  
-  // Save to localStorage (names only for web)
-  saveHotButtons();
-  
-  setStatus(`Loaded: ${file.name}`);
+  try {
+    // Get file from handle
+    const fileData = await file.handle.getFile();
+    const url = URL.createObjectURL(fileData);
+    
+    const audio = state.decks[deckNum].audio;
+    
+    // Revoke old URL if exists
+    if (state.decks[deckNum].file && state.decks[deckNum].file.url) {
+      URL.revokeObjectURL(state.decks[deckNum].file.url);
+    }
+    
+    audio.src = url;
+    state.decks[deckNum].file = { name: file.name, url: url, handle: file.handle };
+    
+    document.getElementById(`deckFilename${deckNum}`).textContent = file.name;
+    updateDeckState(deckNum, 'loaded');
+    
+    // Sync with hot button display
+    updateHotButtonDisplay(deckNum);
+    
+    setStatus(`Loaded: ${file.name}`);
+  } catch (err) {
+    console.error('Error loading file:', err);
+    setStatus('Error loading file');
+  }
 }
 
 // Load to first empty deck
@@ -500,6 +573,12 @@ function stopDeck(deckNum) {
 function clearDeck(deckNum) {
   deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
+  
+  // Revoke URL
+  if (state.decks[deckNum].file && state.decks[deckNum].file.url) {
+    URL.revokeObjectURL(state.decks[deckNum].file.url);
+  }
+  
   audio.pause();
   audio.src = '';
   audio.currentTime = 0;
@@ -516,9 +595,6 @@ function clearDeck(deckNum) {
   updateDeckState(deckNum, 'empty');
   updateHotButtonDisplay(deckNum);
   updateQueueButtonState(deckNum);
-  
-  // Save to localStorage
-  saveHotButtons();
   
   setStatus(`Cleared deck ${deckNum}`);
 }
@@ -631,17 +707,6 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Save hot buttons (names only for web - files can't persist)
-function saveHotButtons() {
-  const hotButtonData = {};
-  for (let i = 1; i <= DECK_COUNT; i++) {
-    if (state.decks[i].file) {
-      hotButtonData[i] = { name: state.decks[i].file.name };
-    }
-  }
-  localStorage.setItem('audioPlayerHotButtons', JSON.stringify(hotButtonData));
-}
-
 // Keyboard shortcuts
 function handleKeyboard(e) {
   // Don't trigger shortcuts when typing in input
@@ -667,10 +732,10 @@ function handleKeyboard(e) {
     }
   }
   
-  // Function keys F1-F10 for hot buttons (same as decks now)
+  // Function keys F1-F12 for decks 1-12
   if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
     const num = parseInt(e.key.slice(1));
-    if (num >= 1 && num <= 10) {
+    if (num >= 1 && num <= 12) {
       if (state.decks[num].file) {
         playDeck(num);
       }
@@ -695,6 +760,12 @@ function handleKeyboard(e) {
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+  }
+  
+  // Backspace to navigate up
+  if (e.key === 'Backspace' && !e.target.matches('input')) {
+    navigateUp();
+    e.preventDefault();
   }
 }
 

@@ -5,18 +5,24 @@
 
 // Constants
 const DECK_COUNT = 20;
+const DIR_SLOT_COUNT = 4;
 
 // State Management
 const state = {
-  masterFolder: '',
-  currentFolder: '',
+  directorySlots: {
+    1: { path: '', currentPath: '' },
+    2: { path: '', currentPath: '' },
+    3: { path: '', currentPath: '' },
+    4: { path: '', currentPath: '' }
+  },
+  activeDirectorySlot: 1,
   decks: {},
   selectedFile: null,
   masterVolume: 1,
   searchResults: []
 };
 
-// Initialize decks 1-10
+// Initialize decks 1-20
 for (let i = 1; i <= DECK_COUNT; i++) {
   state.decks[i] = { audio: null, file: null, playing: false, queued: false };
 }
@@ -25,9 +31,6 @@ for (let i = 1; i <= DECK_COUNT; i++) {
 const elements = {
   masterVolume: document.getElementById('masterVolume'),
   masterVolumeValue: document.getElementById('masterVolumeValue'),
-  btnSetMasterFolder: document.getElementById('btnSetMasterFolder'),
-  masterFolderPath: document.getElementById('masterFolderPath'),
-  subfolderSelect: document.getElementById('subfolderSelect'),
   searchInput: document.getElementById('searchInput'),
   btnSearch: document.getElementById('btnSearch'),
   fileList: document.getElementById('fileList'),
@@ -35,7 +38,8 @@ const elements = {
   contextMenu: document.getElementById('contextMenu'),
   deckSelectMenu: document.getElementById('deckSelectMenu'),
   statusMessage: document.getElementById('statusMessage'),
-  statusTime: document.getElementById('statusTime')
+  statusTime: document.getElementById('statusTime'),
+  currentPathDisplay: document.getElementById('currentPathDisplay')
 };
 
 // Initialize Application
@@ -64,20 +68,26 @@ async function init() {
 // Load saved settings
 async function loadSettings() {
   try {
-    // Load master folder
-    const masterFolder = await window.electronAPI.getMasterFolder();
-    if (masterFolder) {
-      state.masterFolder = masterFolder;
-      state.currentFolder = masterFolder;
-      elements.masterFolderPath.textContent = masterFolder;
-      await loadFolderContents(masterFolder);
-      await loadSubfolders(masterFolder);
+    // Load directory slots
+    const savedSlots = await window.electronAPI.getDirectorySlots();
+    if (savedSlots) {
+      for (let i = 1; i <= DIR_SLOT_COUNT; i++) {
+        if (savedSlots[i]) {
+          state.directorySlots[i].path = savedSlots[i];
+          state.directorySlots[i].currentPath = savedSlots[i];
+          const folderName = savedSlots[i].split('/').pop() || savedSlots[i];
+          document.getElementById(`dirPath${i}`).textContent = folderName;
+        }
+      }
+      // Load first slot if it has content
+      if (savedSlots[1]) {
+        switchToDirectorySlot(1);
+      }
     }
     
     // Load hot buttons (which are synced with decks)
     const hotButtons = await window.electronAPI.loadHotButtons();
     if (hotButtons) {
-      // Load each hot button's file to its corresponding deck
       for (const [slot, data] of Object.entries(hotButtons)) {
         const deckNum = parseInt(slot);
         if (data && data.path) {
@@ -128,15 +138,20 @@ function setupEventListeners() {
     updateAllDeckVolumes();
   });
   
-  // Master folder button
-  elements.btnSetMasterFolder.addEventListener('click', selectMasterFolder);
+  // Directory slot buttons
+  document.querySelectorAll('.btn-select-dir').forEach(btn => {
+    btn.addEventListener('click', () => selectDirectory(parseInt(btn.dataset.slot)));
+  });
   
-  // Subfolder select
-  elements.subfolderSelect.addEventListener('change', (e) => {
-    const path = e.target.value || state.masterFolder;
-    if (path) {
-      loadFolderContents(path);
-    }
+  // Directory slot switching
+  document.querySelectorAll('.directory-slot').forEach(slot => {
+    slot.addEventListener('click', (e) => {
+      if (e.target.classList.contains('btn-select-dir')) return;
+      const slotNum = parseInt(slot.dataset.slot);
+      if (state.directorySlots[slotNum].path) {
+        switchToDirectorySlot(slotNum);
+      }
+    });
   });
   
   // Search
@@ -205,7 +220,6 @@ function setupEventListeners() {
       const filePath = e.dataTransfer.getData('text/plain');
       const fileName = e.dataTransfer.getData('text/filename');
       if (filePath) {
-        // Load to both hot button and corresponding deck
         loadToDeck(btn.dataset.slot, filePath, fileName);
       }
     });
@@ -239,37 +253,65 @@ function setupEventListeners() {
     elements.deckSelectMenu.style.display = 'none';
   });
   
-  // IPC events
-  window.electronAPI.onMasterFolderSelected((path) => {
-    state.masterFolder = path;
-    state.currentFolder = path;
-    elements.masterFolderPath.textContent = path;
-    loadFolderContents(path);
-    loadSubfolders(path);
-    window.electronAPI.saveMasterFolder(path);
-  });
-  
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboard);
 }
 
-// Select master folder
-async function selectMasterFolder() {
-  const path = await window.electronAPI.selectMasterFolder();
+// Select directory for a slot
+async function selectDirectory(slotNum) {
+  const path = await window.electronAPI.selectFolder();
   if (path) {
-    state.masterFolder = path;
-    state.currentFolder = path;
-    elements.masterFolderPath.textContent = path;
-    await loadFolderContents(path);
-    await loadSubfolders(path);
-    setStatus('Master folder set: ' + path);
+    state.directorySlots[slotNum].path = path;
+    state.directorySlots[slotNum].currentPath = path;
+    
+    const folderName = path.split('/').pop() || path;
+    document.getElementById(`dirPath${slotNum}`).textContent = folderName;
+    
+    // Save to settings
+    await window.electronAPI.saveDirectorySlots(getDirectorySlotsForSave());
+    
+    // Switch to this slot
+    switchToDirectorySlot(slotNum);
+    
+    setStatus(`Directory ${slotNum} set: ${folderName}`);
+  }
+}
+
+// Get directory slots for saving
+function getDirectorySlotsForSave() {
+  const slots = {};
+  for (let i = 1; i <= DIR_SLOT_COUNT; i++) {
+    if (state.directorySlots[i].path) {
+      slots[i] = state.directorySlots[i].path;
+    }
+  }
+  return slots;
+}
+
+// Switch to a directory slot
+function switchToDirectorySlot(slotNum) {
+  document.querySelectorAll('.directory-slot').forEach(slot => {
+    slot.classList.remove('active');
+  });
+  document.querySelector(`.directory-slot[data-slot="${slotNum}"]`).classList.add('active');
+  
+  state.activeDirectorySlot = slotNum;
+  
+  const slot = state.directorySlots[slotNum];
+  if (slot.path) {
+    loadFolderContents(slot.currentPath || slot.path);
+  } else {
+    elements.fileList.innerHTML = '<p class="file-list-empty">Click the button to select a directory.</p>';
+    elements.currentPathDisplay.textContent = 'No directory selected';
   }
 }
 
 // Load folder contents
 async function loadFolderContents(folderPath) {
   setStatus('Loading folder...');
-  state.currentFolder = folderPath;
+  
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  slot.currentPath = folderPath;
   
   const contents = await window.electronAPI.getFolderContents(folderPath);
   
@@ -279,35 +321,26 @@ async function loadFolderContents(folderPath) {
     return;
   }
   
-  renderFileList(contents);
-  setStatus(`Loaded ${contents.files.length} audio files`);
-}
-
-// Load subfolders
-async function loadSubfolders(masterPath) {
-  const subfolders = await window.electronAPI.getSubfolders(masterPath);
+  // Update path display
+  elements.currentPathDisplay.textContent = folderPath;
   
-  elements.subfolderSelect.innerHTML = '<option value="">All Folders</option>';
-  
-  subfolders.forEach(folder => {
-    const option = document.createElement('option');
-    option.value = folder.path;
-    option.textContent = folder.name;
-    elements.subfolderSelect.appendChild(option);
-  });
+  renderFileList(contents, folderPath);
+  setStatus(`Loaded ${contents.files.length} audio files, ${contents.folders.length} folders`);
 }
 
 // Render file list
-function renderFileList(contents) {
+function renderFileList(contents, currentPath) {
   elements.fileList.innerHTML = '';
   
-  // Add parent folder if not at master level
-  if (state.currentFolder !== state.masterFolder) {
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  
+  // Add parent folder if not at root
+  if (currentPath !== slot.path) {
     const parentItem = document.createElement('div');
     parentItem.className = 'file-item folder-item';
     parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">..</span>`;
     parentItem.addEventListener('click', () => {
-      const parentPath = state.currentFolder.split('/').slice(0, -1).join('/') || state.masterFolder;
+      const parentPath = currentPath.split('/').slice(0, -1).join('/') || slot.path;
       loadFolderContents(parentPath);
     });
     elements.fileList.appendChild(parentItem);
@@ -370,7 +403,6 @@ function showContextMenu(e, file) {
   elements.contextMenu.style.left = `${e.clientX}px`;
   elements.contextMenu.style.top = `${e.clientY}px`;
   
-  // Setup context menu actions
   elements.contextMenu.querySelectorAll('.context-item').forEach(item => {
     item.onclick = () => {
       const action = item.dataset.action;
@@ -384,12 +416,10 @@ function handleContextAction(action, file, e) {
   elements.contextMenu.style.display = 'none';
   
   if (action === 'load-deck' || action === 'assign-hot') {
-    // Show deck selection submenu
     elements.deckSelectMenu.style.display = 'block';
     elements.deckSelectMenu.style.left = `${e.clientX + 150}px`;
     elements.deckSelectMenu.style.top = `${e.clientY}px`;
     
-    // Setup deck selection
     elements.deckSelectMenu.querySelectorAll('.deck-select-item').forEach(item => {
       item.onclick = () => {
         const deckNum = item.dataset.deck;
@@ -404,17 +434,21 @@ function handleContextAction(action, file, e) {
 async function performSearch() {
   const query = elements.searchInput.value.trim();
   if (!query) {
-    loadFolderContents(state.currentFolder);
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    if (slot.currentPath) {
+      loadFolderContents(slot.currentPath);
+    }
     return;
   }
   
-  if (!state.masterFolder) {
-    setStatus('Please set a master folder first');
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  if (!slot.path) {
+    setStatus('Please select a directory first');
     return;
   }
   
   setStatus('Searching...');
-  const results = await window.electronAPI.searchAudioFiles(state.masterFolder, query);
+  const results = await window.electronAPI.searchAudioFiles(slot.path, query);
   
   elements.fileList.innerHTML = '';
   
@@ -458,11 +492,7 @@ function loadToDeck(deckNum, filePath, fileName) {
   
   document.getElementById(`deckFilename${deckNum}`).textContent = fileName || 'Loading...';
   updateDeckState(deckNum, 'loaded');
-  
-  // Sync with hot button display
   updateHotButtonDisplay(deckNum);
-  
-  // Save to persistent storage
   saveHotButtons();
   
   setStatus(`Loaded: ${fileName}`);
@@ -476,7 +506,6 @@ function loadToFirstEmptyDeck(filePath, fileName) {
       return;
     }
   }
-  // All decks full, load to deck 1
   loadToDeck(1, filePath, fileName);
 }
 
@@ -537,8 +566,6 @@ function clearDeck(deckNum) {
   updateDeckState(deckNum, 'empty');
   updateHotButtonDisplay(deckNum);
   updateQueueButtonState(deckNum);
-  
-  // Save to persistent storage
   saveHotButtons();
   
   setStatus(`Cleared deck ${deckNum}`);
@@ -626,10 +653,8 @@ function onDeckEnded(deckNum) {
   updateHotButtonState(deckNum, 'stopped');
   state.decks[deckNum].playing = false;
   
-  // Check if next deck (N+1) is queued
   const nextDeck = deckNum + 1;
   if (nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file) {
-    // Play the next deck
     playDeck(nextDeck);
     setStatus(`Auto-playing queued deck ${nextDeck}`);
   }
@@ -652,7 +677,7 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Save hot buttons (which are now synced with decks)
+// Save hot buttons (synced with decks)
 async function saveHotButtons() {
   const hotButtonData = {};
   for (let i = 1; i <= DECK_COUNT; i++) {
@@ -668,7 +693,6 @@ async function saveHotButtons() {
 
 // Keyboard shortcuts
 function handleKeyboard(e) {
-  // Number keys 1-9 and 0 for decks (0 = deck 10)
   if (!e.ctrlKey && !e.altKey && !e.target.matches('input')) {
     if (e.key >= '1' && e.key <= '9') {
       const deckNum = parseInt(e.key);
@@ -688,10 +712,9 @@ function handleKeyboard(e) {
     }
   }
   
-  // Function keys F1-F10 for hot buttons (same as decks now)
   if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
     const num = parseInt(e.key.slice(1));
-    if (num >= 1 && num <= 10) {
+    if (num >= 1 && num <= 12) {
       if (state.decks[num].file) {
         playDeck(num);
       }
@@ -699,7 +722,6 @@ function handleKeyboard(e) {
     }
   }
   
-  // Space to play/pause deck 1
   if (e.key === ' ' && !e.target.matches('input')) {
     const deck1 = state.decks[1];
     if (deck1.audio.src) {
@@ -712,10 +734,18 @@ function handleKeyboard(e) {
     e.preventDefault();
   }
   
-  // Escape to close context menu
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+  }
+  
+  if (e.key === 'Backspace' && !e.target.matches('input')) {
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    if (slot.currentPath && slot.currentPath !== slot.path) {
+      const parentPath = slot.currentPath.split('/').slice(0, -1).join('/') || slot.path;
+      loadFolderContents(parentPath);
+    }
+    e.preventDefault();
   }
 }
 

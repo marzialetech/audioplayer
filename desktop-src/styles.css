@@ -423,59 +423,87 @@ section h2 {
   border-right: none;
 }
 
-.folder-controls {
-  display: flex;
-  gap: 8px;
-  align-items: center;
+/* Directory Slots */
+.directory-slots {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
   margin-bottom: 8px;
 }
 
-.btn-folder {
+.directory-slot {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-dark);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.directory-slot:hover {
+  border-color: var(--accent-blue);
+}
+
+.directory-slot.active {
+  border-color: var(--accent-green);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.btn-select-dir {
   background: var(--accent-blue);
   border: none;
   color: var(--bg-dark);
-  padding: 6px 12px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 3px;
   cursor: pointer;
   font-weight: bold;
-  font-size: 12px;
+  font-size: 11px;
   white-space: nowrap;
 }
 
-.btn-folder:hover {
+.btn-select-dir:hover {
   background: #33e5ff;
 }
 
-.folder-path {
-  flex: 1;
-  font-size: 11px;
+.dir-path {
+  font-size: 10px;
   color: var(--text-secondary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-.subfolder-selector {
-  display: flex;
-  gap: 8px;
-  align-items: center;
-  margin-bottom: 8px;
+.directory-slot.active .dir-path {
+  color: var(--accent-green);
 }
 
-.subfolder-selector label {
-  color: var(--text-secondary);
-  font-size: 12px;
-}
-
-.subfolder-selector select {
-  flex: 1;
+.current-path-display {
   background: var(--bg-dark);
   border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  padding: 6px;
   border-radius: 4px;
-  cursor: pointer;
-  font-size: 12px;
+  padding: 6px 8px;
+  margin-bottom: 8px;
+  font-size: 11px;
+  color: var(--highlight-yellow);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.folder-item {
+  background: #4a4a6a !important;
+  color: var(--text-primary) !important;
+}
+
+.folder-item:hover {
+  background: #5a5a7a !important;
+}
+
+.folder-item .file-icon {
+  color: var(--accent-yellow);
 }
 
 .search-container {

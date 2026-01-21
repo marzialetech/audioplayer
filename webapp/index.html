@@ -15,7 +15,6 @@
       <div class="brand">
         <img src="assets/icon.png" alt="AudioPlayer" class="app-logo">
         <h1>AudioPlayer</h1>
-        <img src="assets/pixamation-logo.png" alt="by Pixamation" class="pixamation-logo">
       </div>
       <div class="master-controls">
         <label>Master Volume:</label>
@@ -524,22 +523,43 @@
 
       <!-- Right Panel - File Browser -->
       <section class="file-browser-panel">
-        <h2>Audio Library</h2>
-        <div class="folder-controls">
-          <button id="btnAddFiles" class="btn-folder">Add Audio Files</button>
-          <button id="btnClearLibrary" class="btn-clear">Clear Library</button>
-          <input type="file" id="fileInput" multiple accept="audio/*" style="display: none;">
+        <h2>File Browser</h2>
+        
+        <!-- Directory Slots -->
+        <div class="directory-slots">
+          <div class="directory-slot active" data-slot="1">
+            <button class="btn-select-dir" data-slot="1">Dir 1</button>
+            <span class="dir-path" id="dirPath1">Not set</span>
+          </div>
+          <div class="directory-slot" data-slot="2">
+            <button class="btn-select-dir" data-slot="2">Dir 2</button>
+            <span class="dir-path" id="dirPath2">Not set</span>
+          </div>
+          <div class="directory-slot" data-slot="3">
+            <button class="btn-select-dir" data-slot="3">Dir 3</button>
+            <span class="dir-path" id="dirPath3">Not set</span>
+          </div>
+          <div class="directory-slot" data-slot="4">
+            <button class="btn-select-dir" data-slot="4">Dir 4</button>
+            <span class="dir-path" id="dirPath4">Not set</span>
+          </div>
         </div>
-        <div class="drop-zone-info">
-          <p>Drag & drop audio files anywhere, or click "Add Audio Files"</p>
+
+        <!-- Current Path -->
+        <div class="current-path-display">
+          <span id="currentPathDisplay">No directory selected</span>
         </div>
+
+        <!-- Search -->
         <div class="search-container">
           <input type="text" id="searchInput" placeholder="Search audio files..." class="search-input">
           <button id="btnSearch" class="btn-search">Search</button>
         </div>
+
+        <!-- File List -->
         <div class="file-list-container">
           <div class="file-list" id="fileList">
-            <p class="file-list-empty">Add audio files to get started.</p>
+            <p class="file-list-empty">Select a directory to browse audio files.</p>
           </div>
         </div>
       </section>

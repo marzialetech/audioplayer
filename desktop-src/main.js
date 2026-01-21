@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, dialog, Menu, nativeImage } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, Menu } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const Store = require('electron-store');
@@ -48,17 +48,24 @@ function createWindow() {
       label: 'File',
       submenu: [
         {
-          label: 'Set Master Folder',
-          accelerator: 'CmdOrCtrl+O',
-          click: async () => {
-            const result = await dialog.showOpenDialog(mainWindow, {
-              properties: ['openDirectory'],
-              title: 'Select Master Audio Folder'
-            });
-            if (!result.canceled && result.filePaths.length > 0) {
-              mainWindow.webContents.send('master-folder-selected', result.filePaths[0]);
-            }
-          }
+          label: 'Select Directory 1',
+          accelerator: 'CmdOrCtrl+1',
+          click: async () => selectDirectoryFromMenu(1)
+        },
+        {
+          label: 'Select Directory 2',
+          accelerator: 'CmdOrCtrl+2',
+          click: async () => selectDirectoryFromMenu(2)
+        },
+        {
+          label: 'Select Directory 3',
+          accelerator: 'CmdOrCtrl+3',
+          click: async () => selectDirectoryFromMenu(3)
+        },
+        {
+          label: 'Select Directory 4',
+          accelerator: 'CmdOrCtrl+4',
+          click: async () => selectDirectoryFromMenu(4)
         },
         { type: 'separator' },
         {
@@ -120,6 +127,20 @@ function createWindow() {
   }
 }
 
+// Helper to select directory from menu
+async function selectDirectoryFromMenu(slotNum) {
+  const result = await dialog.showOpenDialog(mainWindow, {
+    properties: ['openDirectory'],
+    title: `Select Directory ${slotNum}`
+  });
+  if (!result.canceled && result.filePaths.length > 0) {
+    const slots = store.get('directorySlots', {});
+    slots[slotNum] = result.filePaths[0];
+    store.set('directorySlots', slots);
+    mainWindow.webContents.send('directory-selected', { slot: slotNum, path: result.filePaths[0] });
+  }
+}
+
 app.whenReady().then(createWindow);
 
 app.on('window-all-closed', () => {
@@ -136,28 +157,27 @@ app.on('activate', () => {
 
 // IPC Handlers
 
-// Select master folder
-ipcMain.handle('select-master-folder', async () => {
+// Select folder
+ipcMain.handle('select-folder', async () => {
   const result = await dialog.showOpenDialog(mainWindow, {
     properties: ['openDirectory'],
-    title: 'Select Master Audio Folder'
+    title: 'Select Audio Directory'
   });
   if (!result.canceled && result.filePaths.length > 0) {
-    store.set('masterFolder', result.filePaths[0]);
     return result.filePaths[0];
   }
   return null;
 });
 
-// Get stored master folder
-ipcMain.handle('get-master-folder', () => {
-  return store.get('masterFolder', '');
+// Save directory slots
+ipcMain.handle('save-directory-slots', (event, slots) => {
+  store.set('directorySlots', slots);
+  return true;
 });
 
-// Save master folder
-ipcMain.handle('save-master-folder', (event, folderPath) => {
-  store.set('masterFolder', folderPath);
-  return true;
+// Get directory slots
+ipcMain.handle('get-directory-slots', () => {
+  return store.get('directorySlots', {});
 });
 
 // Get folder contents
@@ -177,7 +197,7 @@ ipcMain.handle('get-folder-contents', async (event, folderPath) => {
         });
       } else if (item.isFile()) {
         const ext = path.extname(item.name).toLowerCase();
-        if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'].includes(ext)) {
+        if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma'].includes(ext)) {
           const filePath = path.join(folderPath, item.name);
           const stats = await fs.promises.stat(filePath);
           result.files.push({
@@ -201,25 +221,6 @@ ipcMain.handle('get-folder-contents', async (event, folderPath) => {
   }
 });
 
-// Get subfolders of master folder
-ipcMain.handle('get-subfolders', async (event, masterPath) => {
-  try {
-    const items = await fs.promises.readdir(masterPath, { withFileTypes: true });
-    const folders = items
-      .filter(item => item.isDirectory())
-      .map(item => ({
-        name: item.name,
-        path: path.join(masterPath, item.name)
-      }))
-      .sort((a, b) => a.name.localeCompare(b.name));
-    
-    return folders;
-  } catch (error) {
-    console.error('Error reading subfolders:', error);
-    return [];
-  }
-});
-
 // Search for audio files
 ipcMain.handle('search-audio-files', async (event, searchPath, query) => {
   const results = [];
@@ -235,7 +236,7 @@ ipcMain.handle('search-audio-files', async (event, searchPath, query) => {
           await searchRecursive(fullPath);
         } else if (item.isFile()) {
           const ext = path.extname(item.name).toLowerCase();
-          if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a'].includes(ext)) {
+          if (['.mp3', '.wav', '.ogg', '.flac', '.aac', '.m4a', '.wma'].includes(ext)) {
             if (item.name.toLowerCase().includes(query.toLowerCase())) {
               results.push({
                 name: item.name,
@@ -263,15 +264,4 @@ ipcMain.handle('save-hot-buttons', (event, buttons) => {
 // Load hot button configuration
 ipcMain.handle('load-hot-buttons', () => {
   return store.get('hotButtons', {});
-});
-
-// Save queue
-ipcMain.handle('save-queue', (event, queue) => {
-  store.set('queue', queue);
-  return true;
-});
-
-// Load queue
-ipcMain.handle('load-queue', () => {
-  return store.get('queue', []);
 });
