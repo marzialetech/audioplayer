@@ -1,5 +1,5 @@
 /**
- * Rockstar by Pixamation - Web Application
+ * rockstar v1.0 by Pixamation - Web Application
  * Browser-based audio playback application
  */
 
@@ -67,7 +67,7 @@ const elements = {
 
 // Initialize Application
 function init() {
-  console.log('Initializing Rockstar Web App...');
+  console.log('Initializing rockstar v1.0...');
   
   // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {

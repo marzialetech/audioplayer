@@ -8,7 +8,7 @@ const store = new Store();
 let mainWindow;
 
 // Set app name (important for macOS dock and menu bar)
-app.setName('Rockstar by Pixamation');
+app.setName('rockstar v1.0 by Pixamation');
 
 // Set dock icon on macOS before app is ready
 if (process.platform === 'darwin') {
@@ -32,7 +32,7 @@ function createWindow() {
       nodeIntegration: false
     },
     icon: iconPath,
-    title: 'Rockstar by Pixamation'
+    title: 'rockstar v1.0 by Pixamation'
   });
   
   // Set dock icon again after window creation (ensures it sticks)
@@ -103,12 +103,12 @@ function createWindow() {
       label: 'Help',
       submenu: [
         {
-          label: 'About Rockstar',
+          label: 'About rockstar',
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About Rockstar by Pixamation',
-              message: 'Rockstar by Pixamation v1.0.0',
+              title: 'About rockstar v1.0 by Pixamation',
+              message: 'rockstar v1.0 by Pixamation',
               detail: 'Professional audio playback application for radio broadcasting and live audio management.\n\nDeveloped by Pixamation\nhttps://pixamation.com',
               icon: path.join(__dirname, 'assets', 'icon.png')
             });

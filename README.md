@@ -1,7 +1,7 @@
-# Rockstar by Pixamation
+# rockstar v1.0 by Pixamation
 
 <p align="center">
-  <img src="assets/icon.png" alt="Rockstar by Pixamation" width="128" height="128">
+  <img src="assets/icon.png" alt="rockstar v1.0 by Pixamation" width="128" height="128">
 </p>
 
 <p align="center">
@@ -46,7 +46,7 @@ player/
 ## Platforms
 
 ### Web App
-Use Rockstar directly in your browser with no installation required.
+Use rockstar directly in your browser with no installation required.
 - Works on any device with a modern browser
 - Drag & drop audio files to add them
 - Files stored in browser session
@@ -115,6 +115,6 @@ MIT License - See [LICENSE](LICENSE) file for details.
 ---
 
 <p align="center">
-  <strong>Rockstar by Pixamation</strong><br>
+  <strong>rockstar v1.0 by Pixamation</strong><br>
   Making audio management simple and powerful
 </p>

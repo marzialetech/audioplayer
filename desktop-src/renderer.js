@@ -1,5 +1,5 @@
 /**
- * Rockstar - WaveCart-style Audio Playback Application
+ * rockstar v1.0 - WaveCart-style Audio Playback Application
  * Main Renderer Process
  */
 
@@ -44,7 +44,7 @@ const elements = {
 
 // Initialize Application
 async function init() {
-  console.log('Initializing Rockstar...');
+  console.log('Initializing rockstar v1.0...');
   
   // Initialize audio elements
   for (let i = 1; i <= DECK_COUNT; i++) {
