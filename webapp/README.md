@@ -1,6 +1,6 @@
-# AudioPlayer by Pixamation - Web Version
+# Rockstar by Pixamation - Web Version
 
-This is the browser-based version of AudioPlayer that can be deployed to any web server.
+This is the browser-based version of Rockstar that can be deployed to any web server.
 
 ## Deployment
 
@@ -79,4 +79,4 @@ Works in all modern browsers:
 
 ---
 
-**AudioPlayer by Pixamation**
+**Rockstar by Pixamation**

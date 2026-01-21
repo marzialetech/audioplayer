@@ -1,7 +1,7 @@
 {
-  "name": "audioplayer-by-pixamation",
+  "name": "rockstar-by-pixamation",
   "version": "1.0.0",
-  "description": "AudioPlayer by Pixamation - Professional audio playback application for radio broadcasting and live audio management",
+  "description": "Rockstar by Pixamation - Professional audio playback application for radio broadcasting and live audio management",
   "main": "main.js",
   "scripts": {
     "start": "electron .",
@@ -30,8 +30,8 @@
     "electron-builder": "^24.9.1"
   },
   "build": {
-    "appId": "com.pixamation.audioplayer",
-    "productName": "AudioPlayer by Pixamation",
+    "appId": "com.pixamation.rockstar",
+    "productName": "Rockstar by Pixamation",
     "directories": {
       "output": "dist"
     },

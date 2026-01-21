@@ -1,5 +1,5 @@
 /**
- * AudioPlayer by Pixamation - Web Application
+ * Rockstar by Pixamation - Web Application
  * Browser-based audio playback application
  */
 
@@ -48,7 +48,7 @@ const elements = {
 
 // Initialize Application
 function init() {
-  console.log('Initializing AudioPlayer Web App...');
+  console.log('Initializing Rockstar Web App...');
   
   // Initialize audio elements
   for (let i = 1; i <= DECK_COUNT; i++) {

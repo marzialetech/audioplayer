@@ -1,7 +1,7 @@
-# AudioPlayer by Pixamation
+# Rockstar by Pixamation
 
 <p align="center">
-  <img src="assets/icon.png" alt="AudioPlayer by Pixamation" width="128" height="128">
+  <img src="assets/icon.png" alt="Rockstar by Pixamation" width="128" height="128">
 </p>
 
 <p align="center">
@@ -31,11 +31,11 @@ player/
 │   └── assets/
 │
 ├── macos/              # macOS downloads
-│   ├── AudioPlayer by Pixamation-1.0.0-arm64.dmg
-│   └── AudioPlayer by Pixamation-1.0.0-arm64-mac.zip
+│   ├── Rockstar by Pixamation-1.0.0-arm64.dmg
+│   └── Rockstar by Pixamation-1.0.0-arm64-mac.zip
 │
 ├── windows/            # Windows downloads
-│   └── AudioPlayer by Pixamation Setup 1.0.0.exe
+│   └── Rockstar by Pixamation Setup 1.0.0.exe
 │
 └── desktop-src/        # Desktop app source code
     ├── package.json
@@ -46,7 +46,7 @@ player/
 ## Platforms
 
 ### Web App
-Use AudioPlayer directly in your browser with no installation required.
+Use Rockstar directly in your browser with no installation required.
 - Works on any device with a modern browser
 - Drag & drop audio files to add them
 - Files stored in browser session
@@ -115,6 +115,6 @@ MIT License - See [LICENSE](LICENSE) file for details.
 ---
 
 <p align="center">
-  <strong>AudioPlayer by Pixamation</strong><br>
+  <strong>Rockstar by Pixamation</strong><br>
   Making audio management simple and powerful
 </p>
