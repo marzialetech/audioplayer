@@ -294,6 +294,14 @@ section h2 {
   align-items: center;
 }
 
+.deck-visualizer {
+  flex: 1;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  margin-left: 4px;
+}
+
 .deck-controls button {
   width: 28px;
   height: 28px;

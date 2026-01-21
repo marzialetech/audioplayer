@@ -6,6 +6,16 @@
 // Constants
 const DECK_COUNT = 20;
 const DIR_SLOT_COUNT = 4;
+const VISUALIZER_BARS = 16;
+const VISUALIZER_COLORS = [
+  '#00ff88', '#00ffaa', '#00ffcc', '#00ffee',
+  '#00eeff', '#00ccff', '#00aaff', '#0088ff',
+  '#ff8800', '#ffaa00', '#ffcc00', '#ffee00',
+  '#ff0088', '#ff00aa', '#ff00cc', '#ff00ee'
+];
+
+// Audio Context for visualizers
+let audioContext = null;
 
 // State Management
 const state = {
@@ -27,7 +37,16 @@ const state = {
 
 // Initialize decks 1-20
 for (let i = 1; i <= DECK_COUNT; i++) {
-  state.decks[i] = { audio: null, file: null, playing: false, queued: false };
+  state.decks[i] = { 
+    audio: null, 
+    file: null, 
+    playing: false, 
+    queued: false,
+    analyser: null,
+    source: null,
+    visualizerCtx: null,
+    dataArray: null
+  };
 }
 
 // DOM Elements
@@ -50,20 +69,119 @@ const elements = {
 function init() {
   console.log('Initializing Rockstar Web App...');
   
-  // Initialize audio elements
+  // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
     state.decks[i].audio = document.getElementById(`audio${i}`);
     setupDeckAudio(i);
+    setupVisualizer(i);
   }
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Start visualizer animation loop
+  requestAnimationFrame(drawAllVisualizers);
   
   // Update status time
   updateStatusTime();
   setInterval(updateStatusTime, 1000);
   
   setStatus('Ready - Select a directory to browse audio files');
+}
+
+// Initialize Audio Context (must be done after user interaction)
+function initAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+// Setup visualizer for a deck
+function setupVisualizer(deckNum) {
+  const canvas = document.getElementById(`visualizer${deckNum}`);
+  if (canvas) {
+    state.decks[deckNum].visualizerCtx = canvas.getContext('2d');
+  }
+}
+
+// Connect audio to analyser (called when audio is loaded)
+function connectAudioAnalyser(deckNum) {
+  const deck = state.decks[deckNum];
+  const audio = deck.audio;
+  
+  // Initialize audio context if needed
+  const ctx = initAudioContext();
+  
+  // Only create source once per audio element
+  if (!deck.source) {
+    deck.source = ctx.createMediaElementSource(audio);
+    deck.analyser = ctx.createAnalyser();
+    deck.analyser.fftSize = 64;
+    deck.dataArray = new Uint8Array(deck.analyser.frequencyBinCount);
+    
+    deck.source.connect(deck.analyser);
+    deck.analyser.connect(ctx.destination);
+  }
+}
+
+// Draw visualizer for a single deck
+function drawVisualizer(deckNum) {
+  const deck = state.decks[deckNum];
+  const ctx = deck.visualizerCtx;
+  const canvas = document.getElementById(`visualizer${deckNum}`);
+  
+  if (!ctx || !canvas) return;
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Clear canvas
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillRect(0, 0, width, height);
+  
+  // If no analyser or not playing, draw flat bars
+  if (!deck.analyser || !deck.playing) {
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+    const barWidth = (width / VISUALIZER_BARS) - 1;
+    for (let i = 0; i < VISUALIZER_BARS; i++) {
+      const x = i * (barWidth + 1);
+      ctx.fillRect(x, height - 2, barWidth, 2);
+    }
+    return;
+  }
+  
+  // Get frequency data
+  deck.analyser.getByteFrequencyData(deck.dataArray);
+  
+  const barWidth = (width / VISUALIZER_BARS) - 1;
+  const dataStep = Math.floor(deck.dataArray.length / VISUALIZER_BARS);
+  
+  for (let i = 0; i < VISUALIZER_BARS; i++) {
+    // Average a range of frequency bins for smoother visualization
+    let sum = 0;
+    for (let j = 0; j < dataStep; j++) {
+      sum += deck.dataArray[i * dataStep + j] || 0;
+    }
+    const value = sum / dataStep;
+    
+    const barHeight = (value / 255) * height;
+    const x = i * (barWidth + 1);
+    
+    // Create gradient from green to cyan
+    const hue = 120 + (i / VISUALIZER_BARS) * 60; // 120 (green) to 180 (cyan)
+    ctx.fillStyle = `hsl(${hue}, 100%, ${50 + (value / 255) * 30}%)`;
+    
+    ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+  }
+}
+
+// Animation loop for all visualizers
+function drawAllVisualizers() {
+  for (let i = 1; i <= DECK_COUNT; i++) {
+    drawVisualizer(i);
+  }
+  requestAnimationFrame(drawAllVisualizers);
 }
 
 // Setup audio deck
@@ -515,6 +633,9 @@ async function loadToDeck(deckNum, file) {
     audio.src = url;
     state.decks[deckNum].file = { name: file.name, url: url, handle: file.handle };
     
+    // Connect audio analyser for visualizer (if not already connected)
+    connectAudioAnalyser(deckNum);
+    
     document.getElementById(`deckFilename${deckNum}`).textContent = file.name;
     updateDeckState(deckNum, 'loaded');
     
@@ -546,6 +667,14 @@ function playDeck(deckNum) {
   deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   if (audio.src) {
+    // Resume audio context if suspended (requires user gesture)
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    // Connect analyser if not already connected
+    if (!state.decks[deckNum].analyser) {
+      connectAudioAnalyser(deckNum);
+    }
     audio.play();
     setStatus(`Playing deck ${deckNum}`);
   }
