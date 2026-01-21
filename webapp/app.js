@@ -272,11 +272,16 @@ async function selectDirectory(slotNum) {
 
 // Switch to a directory slot
 function switchToDirectorySlot(slotNum) {
-  // Update active state
+  // Update active state on directory slots
   document.querySelectorAll('.directory-slot').forEach(slot => {
     slot.classList.remove('active');
   });
   document.querySelector(`.directory-slot[data-slot="${slotNum}"]`).classList.add('active');
+  
+  // Update file browser panel color theme
+  const panel = document.querySelector('.file-browser-panel');
+  panel.classList.remove('slot-1-active', 'slot-2-active', 'slot-3-active', 'slot-4-active');
+  panel.classList.add(`slot-${slotNum}-active`);
   
   state.activeDirectorySlot = slotNum;
   state.currentPath = [];

@@ -479,16 +479,16 @@ section h2 {
   color: #d966ff;
 }
 
-/* Slot 3 - Orange */
+/* Slot 3 - Yellow */
 .directory-slot.slot-3 {
-  background: linear-gradient(135deg, #5c3a1a 0%, #331f0d 100%);
-  border-color: #ff9500;
+  background: linear-gradient(135deg, #5c5c1a 0%, #33330d 100%);
+  border-color: #ffdd00;
 }
 .directory-slot.slot-3.active {
-  background: linear-gradient(135deg, #704a1f 0%, #422a12 100%);
+  background: linear-gradient(135deg, #70701f 0%, #424212 100%);
 }
 .directory-slot.slot-3 .dir-path {
-  color: #ffb347;
+  color: #ffee55;
 }
 
 /* Slot 4 - Green */
@@ -536,23 +536,50 @@ section h2 {
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 11px;
-  color: var(--highlight-yellow);
+  color: var(--active-slot-color, var(--text-secondary));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Active slot color themes */
+.file-browser-panel.slot-1-active {
+  --active-slot-color: #00d4ff;
+  --active-slot-bg: rgba(0, 212, 255, 0.1);
+  --active-slot-border: #00d4ff;
+}
+
+.file-browser-panel.slot-2-active {
+  --active-slot-color: #d966ff;
+  --active-slot-bg: rgba(191, 0, 255, 0.1);
+  --active-slot-border: #bf00ff;
+}
+
+.file-browser-panel.slot-3-active {
+  --active-slot-color: #ffee55;
+  --active-slot-bg: rgba(255, 221, 0, 0.1);
+  --active-slot-border: #ffdd00;
+}
+
+.file-browser-panel.slot-4-active {
+  --active-slot-color: #66ffaa;
+  --active-slot-bg: rgba(0, 255, 136, 0.1);
+  --active-slot-border: #00ff88;
+}
+
 .folder-item {
-  background: #4a4a6a !important;
-  color: var(--text-primary) !important;
+  background: var(--bg-dark) !important;
+  color: var(--active-slot-color, var(--text-primary)) !important;
+  border-left: 3px solid transparent;
 }
 
 .folder-item:hover {
-  background: #5a5a7a !important;
+  background: var(--active-slot-bg, rgba(255, 255, 255, 0.05)) !important;
+  border-left: 3px solid var(--active-slot-color, var(--text-secondary));
 }
 
 .folder-item .file-icon {
-  color: var(--accent-yellow);
+  color: var(--active-slot-color, var(--accent-yellow));
 }
 
 .search-container {
@@ -619,17 +646,19 @@ section h2 {
   border-bottom: 1px solid var(--border-color);
   cursor: pointer;
   transition: background 0.2s;
-  background: var(--highlight-yellow);
-  color: #000;
+  background: var(--bg-medium);
+  color: var(--active-slot-color, var(--text-primary));
 }
 
 .file-item:hover {
-  background: #e6e600;
+  background: var(--active-slot-bg, rgba(255, 255, 255, 0.1));
+  border-left: 3px solid var(--active-slot-color, var(--text-secondary));
 }
 
 .file-item.selected {
-  background: var(--accent-blue);
-  color: var(--bg-dark);
+  background: var(--active-slot-bg, rgba(255, 255, 255, 0.15));
+  border-left: 3px solid var(--active-slot-color, var(--accent-blue));
+  color: var(--active-slot-color, var(--text-primary));
 }
 
 .file-item.dragging {
