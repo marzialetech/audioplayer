@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:; img-src 'self' file:">
-  <title>rockstar v1.0 by Pixamation</title>
+  <title>rockstar v1.1 by Pixamation</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,7 +12,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <h1>rockstar v1.0</h1>
+        <h1>rockstar v1.1</h1>
       </div>
       <div class="master-controls">
         <label>Master Volume:</label>
@@ -47,6 +47,7 @@
               <button class="btn-pause" data-deck="1" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="1" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="1" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer1" width="80" height="28"></canvas>
             </div>
             <audio id="audio1" preload="metadata"></audio>
           </div>
@@ -70,6 +71,7 @@
               <button class="btn-pause" data-deck="2" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="2" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="2" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer2" width="80" height="28"></canvas>
             </div>
             <audio id="audio2" preload="metadata"></audio>
           </div>
@@ -93,6 +95,7 @@
               <button class="btn-pause" data-deck="3" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="3" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="3" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer3" width="80" height="28"></canvas>
             </div>
             <audio id="audio3" preload="metadata"></audio>
           </div>
@@ -116,6 +119,7 @@
               <button class="btn-pause" data-deck="4" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="4" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="4" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer4" width="80" height="28"></canvas>
             </div>
             <audio id="audio4" preload="metadata"></audio>
           </div>
@@ -139,6 +143,7 @@
               <button class="btn-pause" data-deck="5" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="5" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="5" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer5" width="80" height="28"></canvas>
             </div>
             <audio id="audio5" preload="metadata"></audio>
           </div>
@@ -162,6 +167,7 @@
               <button class="btn-pause" data-deck="6" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="6" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="6" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer6" width="80" height="28"></canvas>
             </div>
             <audio id="audio6" preload="metadata"></audio>
           </div>
@@ -185,6 +191,7 @@
               <button class="btn-pause" data-deck="7" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="7" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="7" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer7" width="80" height="28"></canvas>
             </div>
             <audio id="audio7" preload="metadata"></audio>
           </div>
@@ -208,6 +215,7 @@
               <button class="btn-pause" data-deck="8" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="8" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="8" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer8" width="80" height="28"></canvas>
             </div>
             <audio id="audio8" preload="metadata"></audio>
           </div>
@@ -231,6 +239,7 @@
               <button class="btn-pause" data-deck="9" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="9" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="9" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer9" width="80" height="28"></canvas>
             </div>
             <audio id="audio9" preload="metadata"></audio>
           </div>
@@ -254,6 +263,7 @@
               <button class="btn-pause" data-deck="10" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="10" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="10" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer10" width="80" height="28"></canvas>
             </div>
             <audio id="audio10" preload="metadata"></audio>
           </div>
@@ -277,6 +287,7 @@
               <button class="btn-pause" data-deck="11" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="11" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="11" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer11" width="80" height="28"></canvas>
             </div>
             <audio id="audio11" preload="metadata"></audio>
           </div>
@@ -300,6 +311,7 @@
               <button class="btn-pause" data-deck="12" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="12" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="12" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer12" width="80" height="28"></canvas>
             </div>
             <audio id="audio12" preload="metadata"></audio>
           </div>
@@ -323,6 +335,7 @@
               <button class="btn-pause" data-deck="13" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="13" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="13" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer13" width="80" height="28"></canvas>
             </div>
             <audio id="audio13" preload="metadata"></audio>
           </div>
@@ -346,6 +359,7 @@
               <button class="btn-pause" data-deck="14" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="14" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="14" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer14" width="80" height="28"></canvas>
             </div>
             <audio id="audio14" preload="metadata"></audio>
           </div>
@@ -369,6 +383,7 @@
               <button class="btn-pause" data-deck="15" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="15" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="15" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer15" width="80" height="28"></canvas>
             </div>
             <audio id="audio15" preload="metadata"></audio>
           </div>
@@ -392,6 +407,7 @@
               <button class="btn-pause" data-deck="16" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="16" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="16" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer16" width="80" height="28"></canvas>
             </div>
             <audio id="audio16" preload="metadata"></audio>
           </div>
@@ -415,6 +431,7 @@
               <button class="btn-pause" data-deck="17" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="17" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="17" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer17" width="80" height="28"></canvas>
             </div>
             <audio id="audio17" preload="metadata"></audio>
           </div>
@@ -438,6 +455,7 @@
               <button class="btn-pause" data-deck="18" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="18" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="18" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer18" width="80" height="28"></canvas>
             </div>
             <audio id="audio18" preload="metadata"></audio>
           </div>
@@ -461,6 +479,7 @@
               <button class="btn-pause" data-deck="19" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="19" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="19" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer19" width="80" height="28"></canvas>
             </div>
             <audio id="audio19" preload="metadata"></audio>
           </div>
@@ -484,6 +503,7 @@
               <button class="btn-pause" data-deck="20" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="20" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="20" min="0" max="100" value="100" title="Volume">
+              <canvas class="deck-visualizer" id="visualizer20" width="80" height="28"></canvas>
             </div>
             <audio id="audio20" preload="metadata"></audio>
           </div>
@@ -520,26 +540,26 @@
       </section>
 
       <!-- Right Panel - File Browser -->
-      <section class="file-browser-panel">
+      <section class="file-browser-panel slot-1-active">
         <h2>File Browser</h2>
         
         <!-- Directory Slots -->
         <div class="directory-slots">
-          <div class="directory-slot active" data-slot="1">
-            <button class="btn-select-dir" data-slot="1">Dir 1</button>
-            <span class="dir-path" id="dirPath1">Not set</span>
+          <div class="directory-slot slot-1 active" data-slot="1">
+            <button class="btn-select-dir" data-slot="1">Select</button>
+            <span class="dir-path" id="dirPath1">Folder 1</span>
           </div>
-          <div class="directory-slot" data-slot="2">
-            <button class="btn-select-dir" data-slot="2">Dir 2</button>
-            <span class="dir-path" id="dirPath2">Not set</span>
+          <div class="directory-slot slot-2" data-slot="2">
+            <button class="btn-select-dir" data-slot="2">Select</button>
+            <span class="dir-path" id="dirPath2">Folder 2</span>
           </div>
-          <div class="directory-slot" data-slot="3">
-            <button class="btn-select-dir" data-slot="3">Dir 3</button>
-            <span class="dir-path" id="dirPath3">Not set</span>
+          <div class="directory-slot slot-3" data-slot="3">
+            <button class="btn-select-dir" data-slot="3">Select</button>
+            <span class="dir-path" id="dirPath3">Folder 3</span>
           </div>
-          <div class="directory-slot" data-slot="4">
-            <button class="btn-select-dir" data-slot="4">Dir 4</button>
-            <span class="dir-path" id="dirPath4">Not set</span>
+          <div class="directory-slot slot-4" data-slot="4">
+            <button class="btn-select-dir" data-slot="4">Select</button>
+            <span class="dir-path" id="dirPath4">Folder 4</span>
           </div>
         </div>
 
@@ -568,6 +588,14 @@
       <span id="statusMessage">Ready</span>
       <span id="statusTime"></span>
     </footer>
+  </div>
+
+  <!-- Drop Overlay -->
+  <div class="drop-overlay" id="dropOverlay">
+    <div class="drop-overlay-content">
+      <span class="drop-icon">🎵</span>
+      <span class="drop-text">Drop audio files here</span>
+    </div>
   </div>
 
   <!-- Context Menu (hidden) -->

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>rockstar v1.0 by Pixamation</title>
+  <title>rockstar v1.1 by Pixamation</title>
   <link rel="icon" type="image/png" href="assets/icon.png">
   <link rel="apple-touch-icon" href="assets/icon.png">
   <link rel="stylesheet" href="styles.css">
@@ -13,7 +13,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <h1>rockstar v1.0</h1>
+        <h1>rockstar v1.1</h1>
       </div>
       <div class="master-controls">
         <label>Master Volume:</label>
@@ -26,7 +26,13 @@
     <main class="main-content">
       <!-- Left Panel - Audio Decks -->
       <section class="audio-decks-panel">
-        <h2>Audio Decks</h2>
+        <div class="panel-header">
+          <h2>Audio Decks</h2>
+          <button class="btn-layout-toggle" id="btnLayoutToggle" title="Toggle 20x1 / 10x2 layout">
+            <span class="layout-icon">▤</span>
+            <span class="layout-label">20×1</span>
+          </button>
+        </div>
         <div class="audio-decks" id="audioDecks">
           <!-- Audio Decks 1-20 -->
           <div class="audio-deck" data-deck="1">
@@ -537,7 +543,7 @@
           <button class="hot-button" data-slot="19"><span class="hot-number">19</span><span class="hot-label">Empty</span></button>
           <button class="hot-button" data-slot="20"><span class="hot-number">20</span><span class="hot-label">Empty</span></button>
         </div>
-        <p class="hot-buttons-hint">Drag audio files to assign. Click to play. Right-click to clear.</p>
+        <p class="hot-buttons-hint">Drag or click file, then click deck/button. Right-click to clear.</p>
       </section>
 
       <!-- Right Panel - File Browser -->

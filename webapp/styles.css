@@ -1,4 +1,4 @@
-/* AudioPlayer by Pixamation - Web App Styles */
+/* rockstar v1.1 by Pixamation - Web App Styles */
 
 * {
   margin: 0;
@@ -137,6 +137,83 @@ section h2 {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  transition: width 0.3s ease;
+}
+
+.audio-decks-panel.layout-10x2 {
+  width: 520px;
+  min-width: 480px;
+}
+
+.audio-decks-panel.layout-10x2 .audio-deck {
+  padding: 4px 6px;
+}
+
+.audio-decks-panel.layout-10x2 .deck-header {
+  margin-bottom: 2px;
+}
+
+.audio-decks-panel.layout-10x2 .deck-timers {
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+
+.audio-decks-panel.layout-10x2 .deck-controls button {
+  width: 24px;
+  height: 24px;
+  font-size: 10px;
+}
+
+.audio-decks-panel.layout-10x2 .deck-visualizer {
+  height: 24px;
+}
+
+.audio-decks-panel.layout-10x2 .deck-volume {
+  max-width: 50px;
+}
+
+.panel-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.panel-header h2 {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.btn-layout-toggle {
+  background: var(--bg-item);
+  border: 1px solid var(--border-color);
+  color: var(--text-secondary);
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  transition: all 0.2s;
+}
+
+.btn-layout-toggle:hover {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+
+.btn-layout-toggle.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: var(--bg-dark);
+}
+
+.layout-icon {
+  font-size: 14px;
 }
 
 .audio-decks {
@@ -144,6 +221,15 @@ section h2 {
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  gap: 4px;
+}
+
+/* 10x2 Layout - Two columns with proper ordering */
+.audio-decks-panel.layout-10x2 .audio-decks {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: repeat(10, auto);
+  grid-auto-flow: column;
   gap: 4px;
 }
 
@@ -198,9 +284,34 @@ section h2 {
   flex: 1;
   white-space: nowrap;
   overflow: hidden;
-  text-overflow: ellipsis;
   font-size: 12px;
   color: var(--highlight-yellow);
+  position: relative;
+}
+
+.deck-filename-inner {
+  display: inline-block;
+  padding-right: 50px;
+}
+
+/* Marquee scrolling animation for long filenames */
+.deck-filename.scrolling .deck-filename-inner {
+  animation: marquee-scroll 8s linear infinite;
+}
+
+@keyframes marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  10% {
+    transform: translateX(0);
+  }
+  90% {
+    transform: translateX(calc(-100% + 150px));
+  }
+  100% {
+    transform: translateX(calc(-100% + 150px));
+  }
 }
 
 .btn-queue {
@@ -353,6 +464,8 @@ section h2 {
 .hot-buttons-grid {
   display: grid;
   grid-template-columns: repeat(2, 1fr);
+  grid-template-rows: repeat(10, auto);
+  grid-auto-flow: column;
   gap: 6px;
   flex: 1;
   overflow-y: auto;
@@ -665,6 +778,21 @@ section h2 {
 .file-item.selected {
   filter: brightness(1.3);
   box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
+}
+
+/* Click-to-assign mode - visual indicator when file is selected */
+.audio-deck.awaiting-file,
+.hot-button.awaiting-file {
+  animation: awaiting-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes awaiting-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 0 0 rgba(0, 217, 255, 0);
+  }
+  50% { 
+    box-shadow: 0 0 8px 2px rgba(0, 217, 255, 0.4);
+  }
 }
 
 .file-item.dragging {

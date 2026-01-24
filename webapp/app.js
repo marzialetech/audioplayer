@@ -1,5 +1,5 @@
 /**
- * rockstar v1.0 by Pixamation - Web Application
+ * rockstar v1.1 by Pixamation - Web Application
  * Browser-based audio playback application
  */
 
@@ -32,7 +32,9 @@ const state = {
   selectedFile: null,
   masterVolume: 1,
   searchQuery: '',
-  draggingFile: null // Store file being dragged (handles can't be serialized)
+  draggingFile: null, // Store file being dragged (handles can't be serialized)
+  layout: '20x1', // '20x1' or '10x2'
+  clickToAssignMode: false // True when a file is selected and waiting to be assigned
 };
 
 // Initialize decks 1-20
@@ -62,12 +64,14 @@ const elements = {
   dropOverlay: document.getElementById('dropOverlay'),
   statusMessage: document.getElementById('statusMessage'),
   statusTime: document.getElementById('statusTime'),
-  currentPathDisplay: document.getElementById('currentPathDisplay')
+  currentPathDisplay: document.getElementById('currentPathDisplay'),
+  btnLayoutToggle: document.getElementById('btnLayoutToggle'),
+  audioDecksPanel: document.querySelector('.audio-decks-panel')
 };
 
 // Initialize Application
 function init() {
-  console.log('Initializing rockstar v1.0...');
+  console.log('Initializing rockstar v1.1...');
   
   // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
@@ -222,6 +226,9 @@ function setupEventListeners() {
     updateAllDeckVolumes();
   });
   
+  // Layout toggle
+  elements.btnLayoutToggle.addEventListener('click', toggleLayout);
+  
   // Directory slot buttons
   document.querySelectorAll('.btn-select-dir').forEach(btn => {
     btn.addEventListener('click', () => selectDirectory(parseInt(btn.dataset.slot)));
@@ -292,10 +299,19 @@ function setupEventListeners() {
     });
   });
   
-  // Hot buttons - click to play, right-click to clear
+  // Hot buttons - click to play/assign, right-click to clear
   document.querySelectorAll('.hot-button').forEach(btn => {
     btn.addEventListener('click', () => {
       const slot = parseInt(btn.dataset.slot);
+      
+      // If in click-to-assign mode, load the selected file
+      if (state.clickToAssignMode && state.selectedFile) {
+        loadToDeck(slot, state.selectedFile);
+        exitClickToAssignMode();
+        return;
+      }
+      
+      // Otherwise, play if has file
       if (state.decks[slot].file) {
         playDeck(slot);
       }
@@ -326,8 +342,22 @@ function setupEventListeners() {
     });
   });
   
-  // Audio decks drag and drop
+  // Audio decks - click to assign, drag and drop
   document.querySelectorAll('.audio-deck').forEach(deck => {
+    // Click on deck to assign selected file
+    deck.addEventListener('click', (e) => {
+      // Don't trigger if clicking on buttons or sliders
+      if (e.target.matches('button, input')) return;
+      
+      const deckNum = parseInt(deck.dataset.deck);
+      
+      // If in click-to-assign mode, load the selected file
+      if (state.clickToAssignMode && state.selectedFile) {
+        loadToDeck(deckNum, state.selectedFile);
+        exitClickToAssignMode();
+      }
+    });
+    
     deck.addEventListener('dragover', (e) => {
       e.preventDefault();
       deck.classList.add('drag-over');
@@ -347,10 +377,23 @@ function setupEventListeners() {
     });
   });
   
-  // Context menu
-  document.addEventListener('click', () => {
+  // Context menu and click-to-assign cancellation
+  document.addEventListener('click', (e) => {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+    
+    // Cancel click-to-assign mode if clicking outside file list, decks, or hot buttons
+    if (state.clickToAssignMode) {
+      const clickedOnDeck = e.target.closest('.audio-deck');
+      const clickedOnHotButton = e.target.closest('.hot-button');
+      const clickedOnFileItem = e.target.closest('.file-item');
+      
+      // Only cancel if not clicking on a valid target
+      if (!clickedOnDeck && !clickedOnHotButton && !clickedOnFileItem) {
+        exitClickToAssignMode();
+        setStatus('Click-to-assign cancelled');
+      }
+    }
   });
   
   // Keyboard shortcuts
@@ -486,7 +529,7 @@ function renderFileList() {
   if (state.currentPath.length > 0) {
     const parentItem = document.createElement('div');
     parentItem.className = 'file-item folder-item';
-    parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">..</span>`;
+    parentItem.innerHTML = `<span class="file-icon">←</span><span class="file-name">go back</span>`;
     parentItem.addEventListener('click', () => navigateUp());
     elements.fileList.appendChild(parentItem);
   }
@@ -557,11 +600,64 @@ function navigateUp() {
   }
 }
 
-// Select file
+// Select file and enter click-to-assign mode
 function selectFile(element, file) {
   document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
   element.classList.add('selected');
   state.selectedFile = file;
+  
+  // Enter click-to-assign mode
+  enterClickToAssignMode();
+}
+
+// Enter click-to-assign mode
+function enterClickToAssignMode() {
+  state.clickToAssignMode = true;
+  
+  // Add visual indicator to all decks and hot buttons
+  document.querySelectorAll('.audio-deck').forEach(deck => {
+    deck.classList.add('awaiting-file');
+  });
+  document.querySelectorAll('.hot-button').forEach(btn => {
+    btn.classList.add('awaiting-file');
+  });
+  
+  setStatus(`Click on a deck or hot button to load: ${state.selectedFile.name}`);
+}
+
+// Exit click-to-assign mode
+function exitClickToAssignMode() {
+  state.clickToAssignMode = false;
+  state.selectedFile = null;
+  
+  // Remove visual indicators
+  document.querySelectorAll('.audio-deck').forEach(deck => {
+    deck.classList.remove('awaiting-file');
+  });
+  document.querySelectorAll('.hot-button').forEach(btn => {
+    btn.classList.remove('awaiting-file');
+  });
+  document.querySelectorAll('.file-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+}
+
+// Toggle layout between 20x1 and 10x2
+function toggleLayout() {
+  if (state.layout === '20x1') {
+    state.layout = '10x2';
+    elements.audioDecksPanel.classList.add('layout-10x2');
+    elements.btnLayoutToggle.classList.add('active');
+    elements.btnLayoutToggle.querySelector('.layout-label').textContent = '10×2';
+    elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▦';
+  } else {
+    state.layout = '20x1';
+    elements.audioDecksPanel.classList.remove('layout-10x2');
+    elements.btnLayoutToggle.classList.remove('active');
+    elements.btnLayoutToggle.querySelector('.layout-label').textContent = '20×1';
+    elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▤';
+  }
+  setStatus(`Layout changed to ${state.layout}`);
 }
 
 // Show context menu
@@ -636,7 +732,8 @@ async function loadToDeck(deckNum, file) {
     // Connect audio analyser for visualizer (if not already connected)
     connectAudioAnalyser(deckNum);
     
-    document.getElementById(`deckFilename${deckNum}`).textContent = file.name;
+    // Update filename with marquee scrolling for long names
+    updateDeckFilename(deckNum, file.name);
     updateDeckState(deckNum, 'loaded');
     
     // Sync with hot button display
@@ -647,6 +744,29 @@ async function loadToDeck(deckNum, file) {
     console.error('Error loading file:', err);
     setStatus('Error loading file');
   }
+}
+
+// Update deck filename with marquee scrolling for long names
+function updateDeckFilename(deckNum, filename) {
+  const filenameEl = document.getElementById(`deckFilename${deckNum}`);
+  
+  // Create inner span for marquee animation
+  filenameEl.innerHTML = `<span class="deck-filename-inner">${filename}</span>`;
+  
+  // Check if text is longer than container (needs scrolling)
+  const innerSpan = filenameEl.querySelector('.deck-filename-inner');
+  
+  // Use requestAnimationFrame to ensure DOM is updated before measuring
+  requestAnimationFrame(() => {
+    const containerWidth = filenameEl.offsetWidth;
+    const textWidth = innerSpan.scrollWidth;
+    
+    if (textWidth > containerWidth) {
+      filenameEl.classList.add('scrolling');
+    } else {
+      filenameEl.classList.remove('scrolling');
+    }
+  });
 }
 
 // Load to first empty deck
@@ -718,7 +838,11 @@ function clearDeck(deckNum) {
   state.decks[deckNum].playing = false;
   state.decks[deckNum].queued = false;
   
-  document.getElementById(`deckFilename${deckNum}`).textContent = '-- Empty --';
+  // Reset filename display (remove scrolling class and inner span)
+  const filenameEl = document.getElementById(`deckFilename${deckNum}`);
+  filenameEl.classList.remove('scrolling');
+  filenameEl.textContent = '-- Empty --';
+  
   document.getElementById(`deckElapsed${deckNum}`).textContent = '00:00';
   document.getElementById(`deckLength${deckNum}`).textContent = '00:00';
   document.getElementById(`deckRemaining${deckNum}`).textContent = '-00:00';
@@ -727,8 +851,6 @@ function clearDeck(deckNum) {
   updateDeckState(deckNum, 'empty');
   updateHotButtonDisplay(deckNum);
   updateQueueButtonState(deckNum);
-  
-  setStatus(`Cleared deck ${deckNum}`);
 }
 
 // Toggle queue state for a deck
@@ -806,17 +928,21 @@ function updateHotButtonDisplay(deckNum) {
   }
 }
 
-// On deck ended - check sequential queue
+// On deck ended - check sequential queue, then auto-clear
 function onDeckEnded(deckNum) {
   deckNum = parseInt(deckNum);
-  updateDeckState(deckNum, 'loaded');
-  updateHotButtonState(deckNum, 'stopped');
   state.decks[deckNum].playing = false;
   
-  // Check if next deck (N+1) is queued
+  // Check if next deck (N+1) is queued BEFORE clearing
   const nextDeck = deckNum + 1;
-  if (nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file) {
-    // Play the next deck
+  const shouldPlayNext = nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file;
+  
+  // Auto-clear the deck that just finished
+  clearDeck(deckNum);
+  setStatus(`Deck ${deckNum} finished and cleared`);
+  
+  // Now play the next queued deck if applicable
+  if (shouldPlayNext) {
     playDeck(nextDeck);
     setStatus(`Auto-playing queued deck ${nextDeck}`);
   }
@@ -888,10 +1014,14 @@ function handleKeyboard(e) {
     e.preventDefault();
   }
   
-  // Escape to close context menu
+  // Escape to close context menu and exit click-to-assign mode
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+    if (state.clickToAssignMode) {
+      exitClickToAssignMode();
+      setStatus('Click-to-assign cancelled');
+    }
   }
   
   // Backspace to navigate up

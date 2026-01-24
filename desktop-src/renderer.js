@@ -1,11 +1,21 @@
 /**
- * rockstar v1.0 - WaveCart-style Audio Playback Application
- * Main Renderer Process
+ * rockstar v1.1 by Pixamation - Desktop Application
+ * Main Renderer Process with Visualizers and Enhanced Features
  */
 
 // Constants
 const DECK_COUNT = 20;
 const DIR_SLOT_COUNT = 4;
+const VISUALIZER_BARS = 16;
+const VISUALIZER_COLORS = [
+  '#00ff88', '#00ffaa', '#00ffcc', '#00ffee',
+  '#00eeff', '#00ccff', '#00aaff', '#0088ff',
+  '#ff8800', '#ffaa00', '#ffcc00', '#ffee00',
+  '#ff0088', '#ff00aa', '#ff00cc', '#ff00ee'
+];
+
+// Audio Context for visualizers
+let audioContext = null;
 
 // State Management
 const state = {
@@ -19,12 +29,23 @@ const state = {
   decks: {},
   selectedFile: null,
   masterVolume: 1,
-  searchResults: []
+  searchResults: [],
+  searchQuery: '',
+  draggingFile: null
 };
 
 // Initialize decks 1-20
 for (let i = 1; i <= DECK_COUNT; i++) {
-  state.decks[i] = { audio: null, file: null, playing: false, queued: false };
+  state.decks[i] = { 
+    audio: null, 
+    file: null, 
+    playing: false, 
+    queued: false,
+    analyser: null,
+    source: null,
+    visualizerCtx: null,
+    dataArray: null
+  };
 }
 
 // DOM Elements
@@ -37,6 +58,7 @@ const elements = {
   hotButtonsGrid: document.getElementById('hotButtonsGrid'),
   contextMenu: document.getElementById('contextMenu'),
   deckSelectMenu: document.getElementById('deckSelectMenu'),
+  dropOverlay: document.getElementById('dropOverlay'),
   statusMessage: document.getElementById('statusMessage'),
   statusTime: document.getElementById('statusTime'),
   currentPathDisplay: document.getElementById('currentPathDisplay')
@@ -44,12 +66,13 @@ const elements = {
 
 // Initialize Application
 async function init() {
-  console.log('Initializing rockstar v1.0...');
+  console.log('Initializing rockstar v1.1...');
   
-  // Initialize audio elements
+  // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
     state.decks[i].audio = document.getElementById(`audio${i}`);
     setupDeckAudio(i);
+    setupVisualizer(i);
   }
   
   // Load saved settings
@@ -58,11 +81,109 @@ async function init() {
   // Setup event listeners
   setupEventListeners();
   
+  // Start visualizer animation loop
+  requestAnimationFrame(drawAllVisualizers);
+  
   // Update status time
   updateStatusTime();
   setInterval(updateStatusTime, 1000);
   
-  setStatus('Ready');
+  setStatus('Ready - Select a directory to browse audio files');
+}
+
+// Initialize Audio Context (must be done after user interaction)
+function initAudioContext() {
+  if (!audioContext) {
+    audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  return audioContext;
+}
+
+// Setup visualizer for a deck
+function setupVisualizer(deckNum) {
+  const canvas = document.getElementById(`visualizer${deckNum}`);
+  if (canvas) {
+    state.decks[deckNum].visualizerCtx = canvas.getContext('2d');
+  }
+}
+
+// Connect audio to analyser (called when audio is loaded)
+function connectAudioAnalyser(deckNum) {
+  const deck = state.decks[deckNum];
+  const audio = deck.audio;
+  
+  // Initialize audio context if needed
+  const ctx = initAudioContext();
+  
+  // Only create source once per audio element
+  if (!deck.source) {
+    deck.source = ctx.createMediaElementSource(audio);
+    deck.analyser = ctx.createAnalyser();
+    deck.analyser.fftSize = 64;
+    deck.dataArray = new Uint8Array(deck.analyser.frequencyBinCount);
+    
+    deck.source.connect(deck.analyser);
+    deck.analyser.connect(ctx.destination);
+  }
+}
+
+// Draw visualizer for a single deck
+function drawVisualizer(deckNum) {
+  const deck = state.decks[deckNum];
+  const ctx = deck.visualizerCtx;
+  const canvas = document.getElementById(`visualizer${deckNum}`);
+  
+  if (!ctx || !canvas) return;
+  
+  const width = canvas.width;
+  const height = canvas.height;
+  
+  // Clear canvas
+  ctx.fillStyle = 'rgba(0, 0, 0, 0.3)';
+  ctx.fillRect(0, 0, width, height);
+  
+  // If no analyser or not playing, draw flat bars
+  if (!deck.analyser || !deck.playing) {
+    ctx.fillStyle = 'rgba(100, 100, 100, 0.3)';
+    const barWidth = (width / VISUALIZER_BARS) - 1;
+    for (let i = 0; i < VISUALIZER_BARS; i++) {
+      const x = i * (barWidth + 1);
+      ctx.fillRect(x, height - 2, barWidth, 2);
+    }
+    return;
+  }
+  
+  // Get frequency data
+  deck.analyser.getByteFrequencyData(deck.dataArray);
+  
+  const barWidth = (width / VISUALIZER_BARS) - 1;
+  const dataStep = Math.floor(deck.dataArray.length / VISUALIZER_BARS);
+  
+  for (let i = 0; i < VISUALIZER_BARS; i++) {
+    // Average a range of frequency bins for smoother visualization
+    let sum = 0;
+    for (let j = 0; j < dataStep; j++) {
+      sum += deck.dataArray[i * dataStep + j] || 0;
+    }
+    const value = sum / dataStep;
+    
+    const barHeight = (value / 255) * height;
+    const x = i * (barWidth + 1);
+    
+    // Create gradient from green to cyan
+    const hue = 120 + (i / VISUALIZER_BARS) * 60; // 120 (green) to 180 (cyan)
+    ctx.fillStyle = `hsl(${hue}, 100%, ${50 + (value / 255) * 30}%)`;
+    
+    ctx.fillRect(x, height - barHeight, barWidth, barHeight);
+  }
+}
+
+// Animation loop for all visualizers
+function drawAllVisualizers() {
+  for (let i = 1; i <= DECK_COUNT; i++) {
+    drawVisualizer(i);
+  }
+  requestAnimationFrame(drawAllVisualizers);
 }
 
 // Load saved settings
@@ -143,9 +264,10 @@ function setupEventListeners() {
     btn.addEventListener('click', () => selectDirectory(parseInt(btn.dataset.slot)));
   });
   
-  // Directory slot switching
+  // Directory slot switching (click on the slot container)
   document.querySelectorAll('.directory-slot').forEach(slot => {
     slot.addEventListener('click', (e) => {
+      // Don't switch if clicking the button itself
       if (e.target.classList.contains('btn-select-dir')) return;
       const slotNum = parseInt(slot.dataset.slot);
       if (state.directorySlots[slotNum].path) {
@@ -158,6 +280,15 @@ function setupEventListeners() {
   elements.btnSearch.addEventListener('click', performSearch);
   elements.searchInput.addEventListener('keypress', (e) => {
     if (e.key === 'Enter') performSearch();
+  });
+  elements.searchInput.addEventListener('input', (e) => {
+    if (e.target.value === '') {
+      state.searchQuery = '';
+      const slot = state.directorySlots[state.activeDirectorySlot];
+      if (slot.currentPath) {
+        loadFolderContents(slot.currentPath);
+      }
+    }
   });
   
   // Deck controls
@@ -174,7 +305,7 @@ function setupEventListeners() {
   });
   
   document.querySelectorAll('.btn-remove').forEach(btn => {
-    btn.addEventListener('click', () => removeDeck(btn.dataset.deck));
+    btn.addEventListener('click', () => clearDeck(btn.dataset.deck));
   });
   
   // Queue toggle buttons
@@ -187,6 +318,19 @@ function setupEventListeners() {
       const deckNum = e.target.dataset.deck;
       const audio = state.decks[deckNum].audio;
       audio.volume = (e.target.value / 100) * state.masterVolume;
+    });
+  });
+  
+  // Progress bar seeking
+  document.querySelectorAll('.deck-progress').forEach(progress => {
+    progress.addEventListener('click', (e) => {
+      const deckNum = progress.closest('.audio-deck').dataset.deck;
+      const audio = state.decks[deckNum].audio;
+      if (audio.duration) {
+        const rect = progress.getBoundingClientRect();
+        const percent = (e.clientX - rect.left) / rect.width;
+        audio.currentTime = percent * audio.duration;
+      }
     });
   });
   
@@ -290,10 +434,16 @@ function getDirectorySlotsForSave() {
 
 // Switch to a directory slot
 function switchToDirectorySlot(slotNum) {
+  // Update active state on directory slots
   document.querySelectorAll('.directory-slot').forEach(slot => {
     slot.classList.remove('active');
   });
   document.querySelector(`.directory-slot[data-slot="${slotNum}"]`).classList.add('active');
+  
+  // Update file browser panel color theme
+  const panel = document.querySelector('.file-browser-panel');
+  panel.classList.remove('slot-1-active', 'slot-2-active', 'slot-3-active', 'slot-4-active');
+  panel.classList.add(`slot-${slotNum}-active`);
   
   state.activeDirectorySlot = slotNum;
   
@@ -434,6 +584,7 @@ function handleContextAction(action, file, e) {
 async function performSearch() {
   const query = elements.searchInput.value.trim();
   if (!query) {
+    state.searchQuery = '';
     const slot = state.directorySlots[state.activeDirectorySlot];
     if (slot.currentPath) {
       loadFolderContents(slot.currentPath);
@@ -447,6 +598,7 @@ async function performSearch() {
     return;
   }
   
+  state.searchQuery = query;
   setStatus('Searching...');
   const results = await window.electronAPI.searchAudioFiles(slot.path, query);
   
@@ -470,6 +622,11 @@ async function performSearch() {
     item.addEventListener('dragstart', (e) => {
       e.dataTransfer.setData('text/plain', file.path);
       e.dataTransfer.setData('text/filename', file.name);
+      item.classList.add('dragging');
+    });
+    
+    item.addEventListener('dragend', () => {
+      item.classList.remove('dragging');
     });
     
     item.addEventListener('contextmenu', (e) => {
@@ -490,6 +647,9 @@ function loadToDeck(deckNum, filePath, fileName) {
   audio.src = filePath;
   state.decks[deckNum].file = { path: filePath, name: fileName };
   
+  // Connect audio analyser for visualizer (if not already connected)
+  connectAudioAnalyser(deckNum);
+  
   document.getElementById(`deckFilename${deckNum}`).textContent = fileName || 'Loading...';
   updateDeckState(deckNum, 'loaded');
   updateHotButtonDisplay(deckNum);
@@ -503,10 +663,11 @@ function loadToFirstEmptyDeck(filePath, fileName) {
   for (let i = 1; i <= DECK_COUNT; i++) {
     if (!state.decks[i].file) {
       loadToDeck(i, filePath, fileName);
-      return;
+      return i;
     }
   }
   loadToDeck(1, filePath, fileName);
+  return 1;
 }
 
 // Play deck
@@ -514,6 +675,14 @@ function playDeck(deckNum) {
   deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
   if (audio.src) {
+    // Resume audio context if suspended (requires user gesture)
+    if (audioContext && audioContext.state === 'suspended') {
+      audioContext.resume();
+    }
+    // Connect analyser if not already connected
+    if (!state.decks[deckNum].analyser) {
+      connectAudioAnalyser(deckNum);
+    }
     audio.play();
     setStatus(`Playing deck ${deckNum}`);
   }
@@ -538,12 +707,6 @@ function stopDeck(deckNum) {
   updateDeckState(deckNum, 'stopped');
   updateHotButtonState(deckNum, 'stopped');
   setStatus(`Stopped deck ${deckNum}`);
-}
-
-// Remove deck content (clear)
-function removeDeck(deckNum) {
-  deckNum = parseInt(deckNum);
-  clearDeck(deckNum);
 }
 
 // Clear deck and synced hot button
@@ -693,7 +856,11 @@ async function saveHotButtons() {
 
 // Keyboard shortcuts
 function handleKeyboard(e) {
-  if (!e.ctrlKey && !e.altKey && !e.target.matches('input')) {
+  // Don't trigger shortcuts when typing in input
+  if (e.target.matches('input')) return;
+  
+  // Number keys 1-9 and 0 for decks (0 = deck 10)
+  if (!e.ctrlKey && !e.altKey) {
     if (e.key >= '1' && e.key <= '9') {
       const deckNum = parseInt(e.key);
       if (e.shiftKey) {
@@ -712,6 +879,7 @@ function handleKeyboard(e) {
     }
   }
   
+  // Function keys F1-F12 for decks 1-12
   if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
     const num = parseInt(e.key.slice(1));
     if (num >= 1 && num <= 12) {
@@ -722,7 +890,8 @@ function handleKeyboard(e) {
     }
   }
   
-  if (e.key === ' ' && !e.target.matches('input')) {
+  // Space to play/pause deck 1
+  if (e.key === ' ') {
     const deck1 = state.decks[1];
     if (deck1.audio.src) {
       if (deck1.playing) {
@@ -734,11 +903,13 @@ function handleKeyboard(e) {
     e.preventDefault();
   }
   
+  // Escape to close context menu
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
   }
   
+  // Backspace to navigate up
   if (e.key === 'Backspace' && !e.target.matches('input')) {
     const slot = state.directorySlots[state.activeDirectorySlot];
     if (slot.currentPath && slot.currentPath !== slot.path) {

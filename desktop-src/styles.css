@@ -1,4 +1,4 @@
-/* WaveCart-style AudioPlayer Styles */
+/* rockstar v1.1 by Pixamation - Desktop App Styles */
 
 * {
   margin: 0;
@@ -19,6 +19,7 @@
   --text-secondary: #a0a0a0;
   --border-color: #2a2a4a;
   --highlight-yellow: #ffff00;
+  --pixamation-green: #7AC143;
 }
 
 body {
@@ -276,6 +277,7 @@ section h2 {
   border-radius: 2px;
   overflow: hidden;
   margin-bottom: 4px;
+  cursor: pointer;
 }
 
 .progress-bar {
@@ -290,6 +292,14 @@ section h2 {
   display: flex;
   gap: 4px;
   align-items: center;
+}
+
+.deck-visualizer {
+  flex: 1;
+  height: 28px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  margin-left: 4px;
 }
 
 .deck-controls button {
@@ -433,51 +443,98 @@ section h2 {
 
 .directory-slot {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   background: var(--bg-dark);
-  border: 1px solid var(--border-color);
-  border-radius: 4px;
-  padding: 4px;
+  border: 2px solid var(--border-color);
+  border-radius: 6px;
+  padding: 6px 8px;
   cursor: pointer;
   transition: all 0.2s;
 }
 
 .directory-slot:hover {
-  border-color: var(--accent-blue);
+  filter: brightness(1.1);
 }
 
 .directory-slot.active {
-  border-color: var(--accent-green);
-  background: rgba(0, 255, 136, 0.1);
+  border-width: 3px;
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+}
+
+/* Slot 1 - Blue */
+.directory-slot.slot-1 {
+  background: linear-gradient(135deg, #1a3a5c 0%, #0d1f33 100%);
+  border-color: #00d4ff;
+}
+.directory-slot.slot-1.active {
+  background: linear-gradient(135deg, #1f4a70 0%, #122a42 100%);
+}
+.directory-slot.slot-1 .dir-path {
+  color: #00d4ff;
+}
+
+/* Slot 2 - Purple */
+.directory-slot.slot-2 {
+  background: linear-gradient(135deg, #3d1a5c 0%, #1f0d33 100%);
+  border-color: #bf00ff;
+}
+.directory-slot.slot-2.active {
+  background: linear-gradient(135deg, #4d2270 0%, #2a1242 100%);
+}
+.directory-slot.slot-2 .dir-path {
+  color: #d966ff;
+}
+
+/* Slot 3 - Yellow */
+.directory-slot.slot-3 {
+  background: linear-gradient(135deg, #5c5c1a 0%, #33330d 100%);
+  border-color: #ffdd00;
+}
+.directory-slot.slot-3.active {
+  background: linear-gradient(135deg, #70701f 0%, #424212 100%);
+}
+.directory-slot.slot-3 .dir-path {
+  color: #ffee55;
+}
+
+/* Slot 4 - Green */
+.directory-slot.slot-4 {
+  background: linear-gradient(135deg, #1a5c3a 0%, #0d331f 100%);
+  border-color: #00ff88;
+}
+.directory-slot.slot-4.active {
+  background: linear-gradient(135deg, #22704a 0%, #12422a 100%);
+}
+.directory-slot.slot-4 .dir-path {
+  color: #66ffaa;
 }
 
 .btn-select-dir {
-  background: var(--accent-blue);
-  border: none;
-  color: var(--bg-dark);
-  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.15);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  color: rgba(255, 255, 255, 0.8);
+  padding: 2px 6px;
   border-radius: 3px;
   cursor: pointer;
-  font-weight: bold;
-  font-size: 11px;
+  font-size: 9px;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .btn-select-dir:hover {
-  background: #33e5ff;
+  background: rgba(255, 255, 255, 0.25);
+  color: white;
 }
 
 .dir-path {
-  font-size: 10px;
-  color: var(--text-secondary);
+  font-size: 14px;
+  font-weight: bold;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.directory-slot.active .dir-path {
-  color: var(--accent-green);
+  flex: 1;
 }
 
 .current-path-display {
@@ -487,23 +544,49 @@ section h2 {
   padding: 6px 8px;
   margin-bottom: 8px;
   font-size: 11px;
-  color: var(--highlight-yellow);
+  color: var(--active-slot-color, var(--text-secondary));
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+/* Active slot color themes */
+.file-browser-panel.slot-1-active {
+  --active-slot-color: #00d4ff;
+  --active-slot-bg: rgba(0, 212, 255, 0.1);
+  --active-slot-border: #00d4ff;
+}
+
+.file-browser-panel.slot-2-active {
+  --active-slot-color: #d966ff;
+  --active-slot-bg: rgba(191, 0, 255, 0.1);
+  --active-slot-border: #bf00ff;
+}
+
+.file-browser-panel.slot-3-active {
+  --active-slot-color: #ffee55;
+  --active-slot-bg: rgba(255, 221, 0, 0.1);
+  --active-slot-border: #ffdd00;
+}
+
+.file-browser-panel.slot-4-active {
+  --active-slot-color: #66ffaa;
+  --active-slot-bg: rgba(0, 255, 136, 0.1);
+  --active-slot-border: #00ff88;
+}
+
 .folder-item {
-  background: #4a4a6a !important;
-  color: var(--text-primary) !important;
+  background: var(--bg-dark) !important;
+  color: var(--active-slot-color, var(--text-primary)) !important;
+  font-weight: normal;
 }
 
 .folder-item:hover {
-  background: #5a5a7a !important;
+  background: var(--active-slot-bg, rgba(255, 255, 255, 0.05)) !important;
 }
 
 .folder-item .file-icon {
-  color: var(--accent-yellow);
+  color: var(--active-slot-color, var(--accent-yellow));
 }
 
 .search-container {
@@ -567,20 +650,21 @@ section h2 {
   display: flex;
   align-items: center;
   padding: 6px 10px;
-  border-bottom: 1px solid var(--border-color);
+  border-bottom: 1px solid rgba(0, 0, 0, 0.3);
   cursor: pointer;
-  transition: background 0.2s;
-  background: var(--highlight-yellow);
+  transition: background 0.2s, filter 0.2s;
+  background: var(--active-slot-color, #888);
   color: #000;
+  font-weight: 500;
 }
 
 .file-item:hover {
-  background: #e6e600;
+  filter: brightness(1.15);
 }
 
 .file-item.selected {
-  background: var(--accent-blue);
-  color: var(--bg-dark);
+  filter: brightness(1.3);
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.5);
 }
 
 .file-item.dragging {
@@ -598,19 +682,6 @@ section h2 {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.folder-item {
-  background: #4a4a6a;
-  color: var(--text-primary);
-}
-
-.folder-item:hover {
-  background: #5a5a7a;
-}
-
-.folder-item .file-icon {
-  color: var(--accent-yellow);
 }
 
 /* Status Bar */
@@ -657,6 +728,39 @@ section h2 {
 .context-item:hover,
 .deck-select-item:hover {
   background: var(--bg-item);
+  color: var(--accent-blue);
+}
+
+/* Drop Overlay */
+.drop-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(26, 26, 46, 0.95);
+  display: none;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+}
+
+.drop-overlay.active {
+  display: flex;
+}
+
+.drop-overlay-content {
+  text-align: center;
+}
+
+.drop-icon {
+  font-size: 60px;
+  display: block;
+  margin-bottom: 15px;
+}
+
+.drop-text {
+  font-size: 20px;
   color: var(--accent-blue);
 }
 
@@ -722,5 +826,23 @@ input[type="range"]::-webkit-slider-thumb:hover {
   .audio-decks-panel {
     width: 320px;
     min-width: 280px;
+  }
+}
+
+@media (max-width: 900px) {
+  .main-content {
+    flex-direction: column;
+  }
+  
+  .audio-decks-panel,
+  .hot-buttons-panel,
+  .file-browser-panel {
+    width: 100%;
+    min-width: unset;
+    max-height: 40vh;
+  }
+  
+  .hot-buttons-grid {
+    grid-template-columns: repeat(5, 1fr);
   }
 }
