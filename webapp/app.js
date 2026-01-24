@@ -1,5 +1,5 @@
 /**
- * rockstar v1.1 by Pixamation - Web Application
+ * rockstar v1.2 by Pixamation - Web Application
  * Browser-based audio playback application
  */
 
@@ -71,7 +71,7 @@ const elements = {
 
 // Initialize Application
 function init() {
-  console.log('Initializing rockstar v1.1...');
+  console.log('Initializing rockstar v1.2...');
   
   // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
@@ -82,6 +82,12 @@ function init() {
   
   // Setup event listeners
   setupEventListeners();
+  
+  // Load saved audio decks panel width preference
+  const savedWidth = localStorage.getItem('audioDecksPanelWidth');
+  if (savedWidth) {
+    elements.audioDecksPanel.style.width = `${savedWidth}px`;
+  }
   
   // Start visualizer animation loop
   requestAnimationFrame(drawAllVisualizers);
@@ -228,6 +234,12 @@ function setupEventListeners() {
   
   // Layout toggle
   elements.btnLayoutToggle.addEventListener('click', toggleLayout);
+  
+  // Resize handle for audio decks panel
+  setupResizeHandle();
+  
+  // Column resize handle for 10x2 layout
+  setupColumnResizeHandle();
   
   // Directory slot buttons
   document.querySelectorAll('.btn-select-dir').forEach(btn => {
@@ -644,20 +656,156 @@ function exitClickToAssignMode() {
 
 // Toggle layout between 20x1 and 10x2
 function toggleLayout() {
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  
   if (state.layout === '20x1') {
     state.layout = '10x2';
     elements.audioDecksPanel.classList.add('layout-10x2');
     elements.btnLayoutToggle.classList.add('active');
     elements.btnLayoutToggle.querySelector('.layout-label').textContent = '10×2';
     elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▦';
+    // Show column resize handle
+    if (columnResizeHandle) columnResizeHandle.style.display = 'block';
+    // Load saved column widths
+    loadColumnWidths();
   } else {
     state.layout = '20x1';
     elements.audioDecksPanel.classList.remove('layout-10x2');
     elements.btnLayoutToggle.classList.remove('active');
     elements.btnLayoutToggle.querySelector('.layout-label').textContent = '20×1';
     elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▤';
+    // Hide column resize handle
+    if (columnResizeHandle) columnResizeHandle.style.display = 'none';
   }
   setStatus(`Layout changed to ${state.layout}`);
+}
+
+// Setup resize handle for audio decks panel
+function setupResizeHandle() {
+  const resizeHandle = document.getElementById('audioDecksResizeHandle');
+  const audioDecksPanel = elements.audioDecksPanel;
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = parseInt(window.getComputedStyle(audioDecksPanel).width, 10);
+    audioDecksPanel.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const width = startWidth + e.clientX - startX;
+    const minWidth = audioDecksPanel.classList.contains('layout-10x2') ? 480 : 340;
+    const newWidth = Math.max(minWidth, width);
+    
+    audioDecksPanel.style.width = `${newWidth}px`;
+    
+    // For 10x2 layout, update the width
+    if (audioDecksPanel.classList.contains('layout-10x2')) {
+      // Width is set via style, so it overrides the CSS
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      audioDecksPanel.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save width preference
+      const width = parseInt(window.getComputedStyle(audioDecksPanel).width, 10);
+      localStorage.setItem('audioDecksPanelWidth', width);
+    }
+  });
+}
+
+// Setup column resize handle for 10x2 layout
+function setupColumnResizeHandle() {
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  const audioDecks = document.getElementById('audioDecks');
+  if (!columnResizeHandle || !audioDecks) return;
+  
+  let isResizing = false;
+  let startX = 0;
+  let startCol1Percent = 50;
+
+  columnResizeHandle.addEventListener('mousedown', (e) => {
+    if (!elements.audioDecksPanel.classList.contains('layout-10x2')) return;
+    
+    isResizing = true;
+    startX = e.clientX;
+    startCol1Percent = parseFloat(audioDecks.style.getPropertyValue('--col1-width-percent') || '50');
+    columnResizeHandle.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const panelWidth = elements.audioDecksPanel.offsetWidth;
+    const panelPadding = 20; // Approximate padding
+    const availableWidth = panelWidth - panelPadding;
+    const deltaX = e.clientX - startX;
+    const deltaPercent = (deltaX / availableWidth) * 100;
+    
+    let newCol1Percent = startCol1Percent + deltaPercent;
+    // Constrain between 20% and 80%
+    newCol1Percent = Math.max(20, Math.min(80, newCol1Percent));
+    const col2Percent = 100 - newCol1Percent;
+    
+    // Update CSS variables
+    audioDecks.style.setProperty('--col1-width-percent', `${newCol1Percent}%`);
+    audioDecks.style.setProperty('--col1-width', `${newCol1Percent}%`);
+    audioDecks.style.setProperty('--col2-width', `${col2Percent}%`);
+    
+    // Update handle position
+    columnResizeHandle.style.left = `calc(${newCol1Percent}% - 2px)`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      columnResizeHandle.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save column width preference
+      const col1Percent = parseFloat(audioDecks.style.getPropertyValue('--col1-width-percent') || '50');
+      localStorage.setItem('audioDecksColumnWidth', col1Percent);
+    }
+  });
+}
+
+// Load saved column widths for 10x2 layout
+function loadColumnWidths() {
+  const audioDecks = document.getElementById('audioDecks');
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  if (!audioDecks || !elements.audioDecksPanel.classList.contains('layout-10x2')) return;
+  
+  const savedCol1Percent = localStorage.getItem('audioDecksColumnWidth');
+  if (savedCol1Percent) {
+    const col1Percent = parseFloat(savedCol1Percent);
+    const col2Percent = 100 - col1Percent;
+    
+    audioDecks.style.setProperty('--col1-width-percent', `${col1Percent}%`);
+    audioDecks.style.setProperty('--col1-width', `${col1Percent}%`);
+    audioDecks.style.setProperty('--col2-width', `${col2Percent}%`);
+    
+    if (columnResizeHandle) {
+      columnResizeHandle.style.left = `calc(${col1Percent}% - 2px)`;
+    }
+  }
 }
 
 // Show context menu
@@ -838,6 +986,13 @@ function clearDeck(deckNum) {
   state.decks[deckNum].playing = false;
   state.decks[deckNum].queued = false;
   
+  // Reset deck volume to 100%
+  const volumeSlider = document.querySelector(`.deck-volume[data-deck="${deckNum}"]`);
+  if (volumeSlider) {
+    volumeSlider.value = 100;
+    audio.volume = state.masterVolume;
+  }
+  
   // Reset filename display (remove scrolling class and inner span)
   const filenameEl = document.getElementById(`deckFilename${deckNum}`);
   filenameEl.classList.remove('scrolling');
@@ -914,16 +1069,33 @@ function updateHotButtonState(deckNum, buttonState) {
   }
 }
 
-// Update hot button display (sync with deck)
+// Update hot button display (sync with deck) with marquee scrolling for long names
 function updateHotButtonDisplay(deckNum) {
   const button = document.querySelector(`.hot-button[data-slot="${deckNum}"]`);
   const label = button.querySelector('.hot-label');
   
   if (state.decks[deckNum].file) {
-    label.textContent = state.decks[deckNum].file.name.replace(/\.[^/.]+$/, '');
+    const filename = state.decks[deckNum].file.name.replace(/\.[^/.]+$/, '');
+    label.innerHTML = `<span class="hot-label-inner">${filename}</span>`;
     button.classList.add('assigned');
+    
+    // Check if text is longer than container (needs scrolling)
+    requestAnimationFrame(() => {
+      const innerSpan = label.querySelector('.hot-label-inner');
+      if (innerSpan) {
+        const containerWidth = label.offsetWidth;
+        const textWidth = innerSpan.scrollWidth;
+        
+        if (textWidth > containerWidth) {
+          label.classList.add('scrolling');
+        } else {
+          label.classList.remove('scrolling');
+        }
+      }
+    });
   } else {
-    label.textContent = 'Empty';
+    label.innerHTML = '<span class="hot-label-inner">Empty</span>';
+    label.classList.remove('scrolling');
     button.classList.remove('assigned', 'playing');
   }
 }
@@ -932,6 +1104,13 @@ function updateHotButtonDisplay(deckNum) {
 function onDeckEnded(deckNum) {
   deckNum = parseInt(deckNum);
   state.decks[deckNum].playing = false;
+  
+  // Restore deck volume to 100%
+  const volumeSlider = document.querySelector(`.deck-volume[data-deck="${deckNum}"]`);
+  if (volumeSlider) {
+    volumeSlider.value = 100;
+    state.decks[deckNum].audio.volume = state.masterVolume;
+  }
   
   // Check if next deck (N+1) is queued BEFORE clearing
   const nextDeck = deckNum + 1;

@@ -1,4 +1,4 @@
-/* rockstar v1.1 by Pixamation - Web App Styles */
+/* rockstar v1.2 by Pixamation - Web App Styles */
 
 * {
   margin: 0;
@@ -133,16 +133,24 @@ section h2 {
 .audio-decks-panel {
   width: 380px;
   min-width: 340px;
+  flex-shrink: 0; /* Don't shrink, but can grow if needed */
   background: var(--bg-panel);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  overflow: hidden; /* Prevent all scrolling */
   transition: width 0.3s ease;
+  position: relative; /* For resize handle positioning */
+}
+
+.audio-decks-panel.resizing {
+  transition: none; /* Disable transition during resize */
 }
 
 .audio-decks-panel.layout-10x2 {
-  width: 520px;
-  min-width: 480px;
+  width: 520px; /* Fixed width like 20x1, but resizable */
+  min-width: 480px; /* Minimum width */
+  overflow-y: auto; /* Allow vertical scrolling */
+  overflow-x: hidden; /* Prevent horizontal expansion, cards fill viewport */
 }
 
 .audio-decks-panel.layout-10x2 .audio-deck {
@@ -219,6 +227,7 @@ section h2 {
 .audio-decks {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal scrolling */
   display: flex;
   flex-direction: column;
   gap: 4px;
@@ -227,10 +236,39 @@ section h2 {
 /* 10x2 Layout - Two columns with proper ordering */
 .audio-decks-panel.layout-10x2 .audio-decks {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: var(--col1-width, 1fr) var(--col2-width, 1fr); /* Adjustable columns */
   grid-template-rows: repeat(10, auto);
   grid-auto-flow: column;
   gap: 4px;
+  overflow-y: auto; /* Allow vertical scrolling */
+  overflow-x: hidden; /* Cards fill viewport, no expansion */
+  min-width: 0; /* Allow grid to shrink if needed */
+  width: 100%; /* Fill panel width */
+  position: relative; /* For resize handle positioning */
+}
+
+/* Column resize handle for 10x2 layout */
+.audio-decks-panel.layout-10x2 .column-resize-handle {
+  position: absolute;
+  left: calc(var(--col1-width-percent, 50%) - 2px);
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: transparent;
+  cursor: col-resize;
+  z-index: 10;
+  pointer-events: auto;
+  transition: background 0.2s;
+}
+
+.audio-decks-panel.layout-10x2 .column-resize-handle:hover {
+  background: var(--accent-blue);
+  opacity: 0.5;
+}
+
+.audio-decks-panel.layout-10x2 .column-resize-handle.resizing {
+  background: var(--accent-blue);
+  opacity: 1;
 }
 
 /* Compact Audio Deck */
@@ -452,13 +490,41 @@ section h2 {
   max-width: 80px;
 }
 
+/* Resize Handle */
+.resize-handle {
+  width: 4px;
+  background: var(--border-color);
+  cursor: col-resize;
+  flex-shrink: 0;
+  position: relative;
+  transition: background 0.2s;
+  z-index: 10;
+}
+
+.resize-handle:hover {
+  background: var(--accent-blue);
+}
+
+.resize-handle::before {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  cursor: col-resize;
+}
+
 /* Center Panel - Hot Buttons */
 .hot-buttons-panel {
   width: 260px;
   min-width: 220px;
+  max-width: 260px; /* Prevent expansion */
+  flex-shrink: 0; /* Prevent shrinking */
   background: var(--bg-panel);
   display: flex;
   flex-direction: column;
+  overflow: hidden; /* Prevent content from expanding panel */
 }
 
 .hot-buttons-grid {
@@ -469,6 +535,8 @@ section h2 {
   gap: 6px;
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden; /* Prevent horizontal expansion */
+  min-width: 0; /* Critical for grid constraints */
 }
 
 .hot-button {
@@ -483,6 +551,9 @@ section h2 {
   justify-content: center;
   transition: all 0.2s;
   min-height: 50px;
+  min-width: 0; /* Prevent expansion */
+  overflow: hidden; /* Prevent content from expanding button */
+  max-width: 100%; /* Constrain to grid cell */
 }
 
 .hot-button:hover {
@@ -517,10 +588,37 @@ section h2 {
   font-size: 10px;
   color: var(--text-secondary);
   text-align: center;
+  width: 100%;
   max-width: 100%;
+  min-width: 0;
   overflow: hidden;
-  text-overflow: ellipsis;
   white-space: nowrap;
+  position: relative;
+}
+
+.hot-label-inner {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+/* Marquee scrolling animation for long hot button labels */
+.hot-label.scrolling .hot-label-inner {
+  animation: hot-marquee-scroll 6s linear infinite;
+}
+
+@keyframes hot-marquee-scroll {
+  0% {
+    transform: translateX(0);
+  }
+  15% {
+    transform: translateX(0);
+  }
+  85% {
+    transform: translateX(calc(-100% + 80px));
+  }
+  100% {
+    transform: translateX(calc(-100% + 80px));
+  }
 }
 
 .hot-button.assigned .hot-label {
