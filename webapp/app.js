@@ -34,7 +34,14 @@ const state = {
   searchQuery: '',
   draggingFile: null, // Store file being dragged (handles can't be serialized)
   layout: '20x1', // '20x1' or '10x2'
-  clickToAssignMode: false // True when a file is selected and waiting to be assigned
+  clickToAssignMode: false, // True when a file is selected and waiting to be assigned
+  slotInput: '', // Stores typed number for quick slot assignment (1-20)
+  keyboardFocus: {
+    area: null, // 'files', 'decks', 'hotbuttons', or 'dirslots'
+    index: 0    // Index within the current area
+  },
+  focusFirstFileAfterNav: false, // Flag to focus first file after folder navigation
+  debugMode: false // Debug mode to show keystrokes
 };
 
 // Initialize decks 1-20
@@ -66,7 +73,9 @@ const elements = {
   statusTime: document.getElementById('statusTime'),
   currentPathDisplay: document.getElementById('currentPathDisplay'),
   btnLayoutToggle: document.getElementById('btnLayoutToggle'),
-  audioDecksPanel: document.querySelector('.audio-decks-panel')
+  audioDecksPanel: document.querySelector('.audio-decks-panel'),
+  fileAssignMessage: document.getElementById('fileAssignMessage'),
+  debugOverlay: document.getElementById('debugOverlay')
 };
 
 // Initialize Application
@@ -461,6 +470,8 @@ function switchToDirectorySlot(slotNum) {
   
   const slot = state.directorySlots[slotNum];
   if (slot.handle) {
+    // Set flag to focus first file after loading
+    state.focusFirstFileAfterNav = true;
     loadDirectoryContents(slot.handle);
     elements.currentPathDisplay.textContent = slot.path;
   } else {
@@ -541,7 +552,7 @@ function renderFileList() {
   if (state.currentPath.length > 0) {
     const parentItem = document.createElement('div');
     parentItem.className = 'file-item folder-item';
-    parentItem.innerHTML = `<span class="file-icon">←</span><span class="file-name">go back</span>`;
+    parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">Go Back</span>`;
     parentItem.addEventListener('click', () => navigateUp());
     elements.fileList.appendChild(parentItem);
   }
@@ -590,6 +601,15 @@ function renderFileList() {
     
     elements.fileList.appendChild(div);
   });
+  
+  // Check if we should focus the first file after navigation
+  if (state.focusFirstFileAfterNav) {
+    state.focusFirstFileAfterNav = false;
+    const fileCount = getAreaItemCount('files');
+    if (fileCount > 0) {
+      setKeyboardFocus('files', 0);
+    }
+  }
 }
 
 // Navigate to a subfolder
@@ -625,6 +645,7 @@ function selectFile(element, file) {
 // Enter click-to-assign mode
 function enterClickToAssignMode() {
   state.clickToAssignMode = true;
+  state.slotInput = '';
   
   // Add visual indicator to all decks and hot buttons
   document.querySelectorAll('.audio-deck').forEach(deck => {
@@ -634,13 +655,14 @@ function enterClickToAssignMode() {
     btn.classList.add('awaiting-file');
   });
   
-  setStatus(`Click on a deck or hot button to load: ${state.selectedFile.name}`);
+  setStatus(`"${state.selectedFile.name}" - Click a slot OR type 1-20 + Enter`);
 }
 
 // Exit click-to-assign mode
 function exitClickToAssignMode() {
   state.clickToAssignMode = false;
   state.selectedFile = null;
+  state.slotInput = '';
   
   // Remove visual indicators
   document.querySelectorAll('.audio-deck').forEach(deck => {
@@ -652,6 +674,22 @@ function exitClickToAssignMode() {
   document.querySelectorAll('.file-item').forEach(item => {
     item.classList.remove('selected');
   });
+  
+  // Clear file assign message
+  updateFileAssignMessage('');
+}
+
+// Update the file assign message in the file browser
+function updateFileAssignMessage(slotInput) {
+  if (!elements.fileAssignMessage) return;
+  
+  if (slotInput && state.selectedFile) {
+    elements.fileAssignMessage.textContent = `assign ${state.selectedFile.name} to hot button ${slotInput}`;
+    elements.fileAssignMessage.classList.add('visible');
+  } else {
+    elements.fileAssignMessage.textContent = '';
+    elements.fileAssignMessage.classList.remove('visible');
+  }
 }
 
 // Toggle layout between 20x1 and 10x2
@@ -1144,40 +1182,400 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Keyboard shortcuts
-function handleKeyboard(e) {
-  // Don't trigger shortcuts when typing in input
-  if (e.target.matches('input')) return;
+// Keyboard focus management
+function clearKeyboardFocus() {
+  document.querySelectorAll('.keyboard-focus').forEach(el => {
+    el.classList.remove('keyboard-focus');
+  });
+}
+
+function setKeyboardFocus(area, index) {
+  clearKeyboardFocus();
+  state.keyboardFocus.area = area;
+  state.keyboardFocus.index = index;
   
-  // Number keys 1-9 and 0 for decks (0 = deck 10)
-  if (!e.ctrlKey && !e.altKey) {
-    if (e.key >= '1' && e.key <= '9') {
-      const deckNum = parseInt(e.key);
-      if (e.shiftKey) {
-        stopDeck(deckNum);
-      } else {
-        playDeck(deckNum);
-      }
-      e.preventDefault();
-    } else if (e.key === '0') {
-      if (e.shiftKey) {
-        stopDeck(10);
-      } else {
-        playDeck(10);
-      }
-      e.preventDefault();
+  let element = null;
+  
+  if (area === 'files') {
+    const fileItems = document.querySelectorAll('.file-item');
+    if (fileItems.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, fileItems.length - 1));
+      element = fileItems[state.keyboardFocus.index];
+    }
+  } else if (area === 'decks') {
+    const decks = document.querySelectorAll('.audio-deck');
+    if (decks.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, decks.length - 1));
+      element = decks[state.keyboardFocus.index];
+    }
+  } else if (area === 'hotbuttons') {
+    const buttons = document.querySelectorAll('.hot-button');
+    if (buttons.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, buttons.length - 1));
+      element = buttons[state.keyboardFocus.index];
+    }
+  } else if (area === 'dirslots') {
+    const slots = document.querySelectorAll('.directory-slot');
+    if (slots.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, slots.length - 1));
+      element = slots[state.keyboardFocus.index];
     }
   }
   
-  // Function keys F1-F12 for decks 1-12
-  if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
-    const num = parseInt(e.key.slice(1));
-    if (num >= 1 && num <= 12) {
-      if (state.decks[num].file) {
-        playDeck(num);
+  if (element) {
+    element.classList.add('keyboard-focus');
+    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function getAreaItemCount(area) {
+  if (area === 'files') {
+    return document.querySelectorAll('.file-item').length;
+  } else if (area === 'decks') {
+    return document.querySelectorAll('.audio-deck').length;
+  } else if (area === 'hotbuttons') {
+    return document.querySelectorAll('.hot-button').length;
+  } else if (area === 'dirslots') {
+    return document.querySelectorAll('.directory-slot').length;
+  }
+  return 0;
+}
+
+function handleArrowNavigation(direction) {
+  const { area, index } = state.keyboardFocus;
+  
+  // If no focus yet, start at Hot Button 5
+  if (!area) {
+    setKeyboardFocus('hotbuttons', 4); // Hot Button 5 (0-indexed)
+    return;
+  }
+  
+  // === AUDIO DECKS ===
+  if (area === 'decks') {
+    const deckCount = getAreaItemCount('decks');
+    const deckNum = index + 1; // 1-based deck number
+    
+    // Check if we're in 10x2 layout (2 columns of decks)
+    const is10x2 = state.layout === '10x2';
+    
+    if (is10x2) {
+      // === 10x2 LAYOUT: Decks in 2 columns (1-10 left, 11-20 right) ===
+      if (direction === 'up') {
+        if (deckNum === 1) {
+          // From deck 1, wrap to deck 10
+          setKeyboardFocus('decks', 9);
+        } else if (deckNum === 11) {
+          // From deck 11, wrap to deck 20
+          setKeyboardFocus('decks', 19);
+        } else {
+          setKeyboardFocus('decks', index - 1);
+        }
+      } else if (direction === 'down') {
+        if (deckNum === 10) {
+          // From deck 10, wrap to deck 1
+          setKeyboardFocus('decks', 0);
+        } else if (deckNum === 20) {
+          // From deck 20, wrap to deck 11
+          setKeyboardFocus('decks', 10);
+        } else {
+          setKeyboardFocus('decks', index + 1);
+        }
+      } else if (direction === 'right') {
+        if (deckNum <= 10) {
+          // Right from deck 1-10 goes to deck N+10 (right column)
+          setKeyboardFocus('decks', index + 10);
+        } else {
+          // Right from deck 11-20 goes to hot button N-10
+          setKeyboardFocus('hotbuttons', index - 10);
+        }
+      } else if (direction === 'left') {
+        if (deckNum <= 10) {
+          // Left from deck 1-10 goes to first file if exists, else Select Folder 2
+          const fileCount = getAreaItemCount('files');
+          if (fileCount > 0) {
+            setKeyboardFocus('files', 0);
+          } else {
+            setKeyboardFocus('dirslots', 1);
+          }
+        } else {
+          // Left from deck 11-20 goes to deck N-10 (left column)
+          setKeyboardFocus('decks', index - 10);
+        }
       }
-      e.preventDefault();
+    } else {
+      // === 20x1 LAYOUT: Decks in single column (1-20 vertical) ===
+      if (direction === 'up') {
+        if (index === 0) {
+          // From deck 1, wrap to deck 20
+          setKeyboardFocus('decks', deckCount - 1);
+        } else {
+          setKeyboardFocus('decks', index - 1);
+        }
+      } else if (direction === 'down') {
+        if (index === deckCount - 1) {
+          // From deck 20, wrap to deck 1
+          setKeyboardFocus('decks', 0);
+        } else {
+          setKeyboardFocus('decks', index + 1);
+        }
+      } else if (direction === 'right') {
+        // Right from deck N goes to hot button N
+        setKeyboardFocus('hotbuttons', index);
+      } else if (direction === 'left') {
+        // Any deck in 20x1: left goes to first file if exists, else Select Folder 2
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        } else {
+          setKeyboardFocus('dirslots', 1);
+        }
+      }
     }
+    return;
+  }
+  
+  // === HOT BUTTONS (2-column: 1-10 left, 11-20 right, wrapping within columns) ===
+  if (area === 'hotbuttons') {
+    const slot = index + 1; // slot number is 1-based
+    const is10x2 = state.layout === '10x2';
+    
+    if (direction === 'up') {
+      if (slot === 1) {
+        // From slot 1, wrap to slot 10
+        setKeyboardFocus('hotbuttons', 9);
+      } else if (slot === 11) {
+        // From slot 11, wrap to slot 20
+        setKeyboardFocus('hotbuttons', 19);
+      } else {
+        // Move up within column
+        setKeyboardFocus('hotbuttons', index - 1);
+      }
+    } else if (direction === 'down') {
+      if (slot === 10) {
+        // From slot 10, wrap to slot 1
+        setKeyboardFocus('hotbuttons', 0);
+      } else if (slot === 20) {
+        // From slot 20, wrap to slot 11
+        setKeyboardFocus('hotbuttons', 10);
+      } else {
+        // Move down within column
+        setKeyboardFocus('hotbuttons', index + 1);
+      }
+    } else if (direction === 'right') {
+      if (slot <= 10) {
+        // From left column (1-10), go to right column (11-20)
+        setKeyboardFocus('hotbuttons', index + 10);
+      } else if (slot <= 12) {
+        // From slots 11-12, go to Select Folder 1
+        setKeyboardFocus('dirslots', 0);
+      } else {
+        // From slots 13-20, go to first file in file list
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        } else {
+          // If no files, go to Select Folder 1
+          setKeyboardFocus('dirslots', 0);
+        }
+      }
+    } else if (direction === 'left') {
+      if (slot > 10) {
+        // From right column (11-20), go to left column (1-10)
+        setKeyboardFocus('hotbuttons', index - 10);
+      } else {
+        // From left column (1-10)
+        if (is10x2) {
+          // In 10x2 layout, go to deck N+10
+          setKeyboardFocus('decks', index + 10);
+        } else {
+          // In 20x1 layout, go to corresponding deck N
+          setKeyboardFocus('decks', index);
+        }
+      }
+    }
+    return;
+  }
+  
+  // === DIRECTORY SLOTS (2x2 grid: SF1=top-left, SF2=top-right, SF3=bottom-left, SF4=bottom-right) ===
+  if (area === 'dirslots') {
+    const slotNum = index + 1; // 1-based: 1, 2, 3, 4
+    
+    if (direction === 'up') {
+      if (slotNum === 3) {
+        // SF3 -> SF1
+        setKeyboardFocus('dirslots', 0);
+      } else if (slotNum === 4) {
+        // SF4 -> SF2
+        setKeyboardFocus('dirslots', 1);
+      }
+      // SF1 and SF2 at top, no up action
+    } else if (direction === 'down') {
+      if (slotNum === 1) {
+        // SF1 -> SF3
+        setKeyboardFocus('dirslots', 2);
+      } else if (slotNum === 2) {
+        // SF2 -> SF4
+        setKeyboardFocus('dirslots', 3);
+      } else if (slotNum === 3 || slotNum === 4) {
+        // SF3 or SF4 -> first file in search results
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        }
+      }
+    } else if (direction === 'left') {
+      if (slotNum === 2) {
+        // SF2 -> SF1
+        setKeyboardFocus('dirslots', 0);
+      } else if (slotNum === 4) {
+        // SF4 -> SF3
+        setKeyboardFocus('dirslots', 2);
+      } else if (slotNum === 1 || slotNum === 3) {
+        // SF1 or SF3 -> Hot Button 11
+        setKeyboardFocus('hotbuttons', 10);
+      }
+    } else if (direction === 'right') {
+      if (slotNum === 1) {
+        // SF1 -> SF2
+        setKeyboardFocus('dirslots', 1);
+      } else if (slotNum === 3) {
+        // SF3 -> SF4
+        setKeyboardFocus('dirslots', 3);
+      } else if (slotNum === 2 || slotNum === 4) {
+        // SF2 or SF4 -> Audio Deck Card 1
+        setKeyboardFocus('decks', 0);
+      }
+    }
+    return;
+  }
+  
+  // === FILES (with wrapping) ===
+  if (area === 'files') {
+    const count = getAreaItemCount('files');
+    
+    if (direction === 'up') {
+      if (index === 0) {
+        // From first file, wrap to last file
+        setKeyboardFocus('files', count - 1);
+      } else {
+        setKeyboardFocus('files', index - 1);
+      }
+    } else if (direction === 'down') {
+      if (index === count - 1) {
+        // From last file, wrap to first file
+        setKeyboardFocus('files', 0);
+      } else {
+        setKeyboardFocus('files', index + 1);
+      }
+    } else if (direction === 'left') {
+      // Left from files goes to Hot Button 13
+      setKeyboardFocus('hotbuttons', 12);
+    } else if (direction === 'right') {
+      // Right from files goes to decks
+      setKeyboardFocus('decks', Math.min(index, getAreaItemCount('decks') - 1));
+    }
+    return;
+  }
+}
+
+function handleFocusedItemAction(action) {
+  const { area, index } = state.keyboardFocus;
+  if (!area) return false;
+  
+  if (area === 'files') {
+    const fileItems = document.querySelectorAll('.file-item');
+    if (fileItems[index]) {
+      if (action === 'enter') {
+        // Check if it's a folder
+        if (fileItems[index].classList.contains('folder-item')) {
+          // Set flag to focus first file after navigation
+          state.focusFirstFileAfterNav = true;
+          // Click to navigate into folder
+          fileItems[index].click();
+        } else {
+          // Regular file - click to select for assignment
+          fileItems[index].click();
+        }
+        return true;
+      }
+    }
+  } else if (area === 'decks') {
+    const decks = document.querySelectorAll('.audio-deck');
+    if (decks[index]) {
+      const deckNum = parseInt(decks[index].dataset.deck);
+      if (action === 'enter') {
+        // Play the deck
+        if (state.decks[deckNum].file) {
+          playDeck(deckNum);
+        }
+        return true;
+      } else if (action === 'backspace') {
+        // Clear the deck
+        clearDeck(deckNum);
+        return true;
+      } else if (action === 'queue') {
+        // Toggle queue for the deck
+        toggleQueue(deckNum);
+        return true;
+      }
+    }
+  } else if (area === 'hotbuttons') {
+    const buttons = document.querySelectorAll('.hot-button');
+    if (buttons[index]) {
+      const slot = parseInt(buttons[index].dataset.slot);
+      if (action === 'enter') {
+        // Play the hot button
+        if (state.decks[slot].file) {
+          playDeck(slot);
+        }
+        return true;
+      } else if (action === 'backspace') {
+        // Clear the slot
+        clearDeck(slot);
+        return true;
+      } else if (action === 'queue') {
+        // Toggle queue for the slot
+        toggleQueue(slot);
+        return true;
+      }
+    }
+  } else if (area === 'dirslots') {
+    const slots = document.querySelectorAll('.directory-slot');
+    if (slots[index]) {
+      const slotNum = parseInt(slots[index].dataset.slot);
+      if (action === 'enter') {
+        // Trigger folder selection for this directory slot
+        selectDirectory(slotNum);
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Keyboard shortcuts
+function handleKeyboard(e) {
+  // Don't trigger shortcuts when typing in input fields
+  if (e.target.matches('input')) return;
+  
+  // Show debug info if debug mode is on
+  if (state.debugMode && elements.debugOverlay) {
+    elements.debugOverlay.textContent = `Key: ${e.key}`;
+  }
+  
+  // Toggle debug mode with 'b' (only when not in click-to-assign mode)
+  if ((e.key === 'b' || e.key === 'B') && !state.clickToAssignMode) {
+    state.debugMode = !state.debugMode;
+    if (elements.debugOverlay) {
+      if (state.debugMode) {
+        elements.debugOverlay.classList.add('visible');
+        elements.debugOverlay.textContent = 'Debug ON';
+      } else {
+        elements.debugOverlay.classList.remove('visible');
+      }
+    }
+    e.preventDefault();
+    return;
   }
   
   // Space to play/pause deck 1
@@ -1191,6 +1589,7 @@ function handleKeyboard(e) {
       }
     }
     e.preventDefault();
+    return;
   }
   
   // Escape to close context menu and exit click-to-assign mode
@@ -1198,15 +1597,106 @@ function handleKeyboard(e) {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
     if (state.clickToAssignMode) {
+      state.slotInput = '';
+      updateFileAssignMessage('');
       exitClickToAssignMode();
-      setStatus('Click-to-assign cancelled');
+      setStatus('Assignment cancelled');
+    }
+    clearKeyboardFocus();
+    return;
+  }
+  
+  // Quick slot assignment: only active when in click-to-assign mode
+  if (state.clickToAssignMode && state.selectedFile) {
+    // Number keys 0-9 to build slot number
+    if (e.key >= '0' && e.key <= '9') {
+      state.slotInput += e.key;
+      // Limit to 2 digits (max slot 20)
+      if (state.slotInput.length > 2) {
+        state.slotInput = state.slotInput.slice(-2);
+      }
+      setStatus(`Assign "${state.selectedFile.name}" to slot: ${state.slotInput}_ (Press Enter to confirm)`);
+      updateFileAssignMessage(state.slotInput);
+      e.preventDefault();
+      return;
+    }
+    
+    // Backspace to delete last digit (only if typing a slot number)
+    if (e.key === 'Backspace' && state.slotInput.length > 0) {
+      state.slotInput = state.slotInput.slice(0, -1);
+      if (state.slotInput.length > 0) {
+        setStatus(`Assign "${state.selectedFile.name}" to slot: ${state.slotInput}_ (Press Enter to confirm)`);
+      } else {
+        setStatus(`"${state.selectedFile.name}" - Click a slot OR type 1-20 + Enter`);
+      }
+      updateFileAssignMessage(state.slotInput);
+      e.preventDefault();
+      return;
+    }
+    
+    // Enter to confirm assignment (only if typing a slot number)
+    if (e.key === 'Enter' && state.slotInput.length > 0) {
+      const slotNum = parseInt(state.slotInput);
+      if (slotNum >= 1 && slotNum <= DECK_COUNT) {
+        loadToDeck(slotNum, state.selectedFile);
+        setStatus(`Assigned "${state.selectedFile.name}" to slot ${slotNum}`);
+        state.slotInput = '';
+        updateFileAssignMessage('');
+        exitClickToAssignMode();
+      } else {
+        setStatus(`Invalid slot number. Enter 1-${DECK_COUNT}`);
+        state.slotInput = '';
+        updateFileAssignMessage('');
+      }
+      e.preventDefault();
+      return;
     }
   }
   
-  // Backspace to navigate up
-  if (e.key === 'Backspace' && !e.target.matches('input')) {
-    navigateUp();
+  // Arrow key navigation
+  if (e.key === 'ArrowUp') {
+    handleArrowNavigation('up');
     e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    handleArrowNavigation('down');
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowLeft') {
+    handleArrowNavigation('left');
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowRight') {
+    handleArrowNavigation('right');
+    e.preventDefault();
+    return;
+  }
+  
+  // Enter on focused item (when not in slot assignment mode)
+  if (e.key === 'Enter' && !state.clickToAssignMode) {
+    if (handleFocusedItemAction('enter')) {
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  // Backspace on focused deck/hotbutton to clear it
+  if (e.key === 'Backspace' && !state.clickToAssignMode) {
+    if (handleFocusedItemAction('backspace')) {
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  // Q on focused deck/hotbutton to toggle queue
+  if (e.key === 'q' || e.key === 'Q') {
+    if (handleFocusedItemAction('queue')) {
+      e.preventDefault();
+      return;
+    }
   }
 }
 
