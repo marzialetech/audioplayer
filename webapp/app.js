@@ -82,7 +82,10 @@ const elements = {
   debugOverlay: document.getElementById('debugOverlay'),
   keyboardToggle: document.getElementById('keyboardToggle'),
   fileListHeader: document.getElementById('fileListHeader'),
-  btnResetColumns: document.getElementById('btnResetColumns')
+  btnResetColumns: document.getElementById('btnResetColumns'),
+  metadataPreviewPanel: document.getElementById('metadataPreviewPanel'),
+  metadataPreviewFilename: document.getElementById('metadataPreviewFilename'),
+  metadataPreviewContent: document.getElementById('metadataPreviewContent')
 };
 
 // Initialize Application
@@ -592,6 +595,9 @@ async function loadDirectoryContents(dirHandle, subPath = []) {
   try {
     setStatus('Loading directory...');
     
+    // Clear metadata preview when changing directories
+    clearMetadataPreview();
+    
     const folders = [];
     const files = [];
     
@@ -694,6 +700,57 @@ function sortItems(items) {
 }
 
 // Extract metadata from an audio file
+// ID3 frame ID to metadata field mapping
+const ID3_FRAME_MAP = {
+  'TIT2': 'title',
+  'TPE1': 'artist',
+  'TALB': 'album',
+  'TCON': 'genre',
+  'TRCK': 'track',
+  'TYER': 'year',
+  'TDRC': 'date',        // Recording date (ID3v2.4)
+  'TDAT': 'date',        // Date (ID3v2.3)
+  'COMM': 'comments',
+  'TCOM': 'composer',
+  'TCOP': 'copyright',
+  'TPUB': 'publisher',
+  'TBPM': 'bpm',
+  'TKEY': 'key',
+  'TLEN': 'length',
+  'TENC': 'encoder',
+  'TPE2': 'albumArtist',
+  'TPE3': 'conductor',
+  'TPOS': 'discNumber',
+  'TSRC': 'isrc',
+  'USLT': 'lyrics',
+  'WXXX': 'url'
+};
+
+// Human-readable labels for metadata fields
+const METADATA_LABELS = {
+  title: 'Title',
+  artist: 'Artist',
+  album: 'Album',
+  genre: 'Genre',
+  track: 'Track',
+  year: 'Year',
+  date: 'Date',
+  comments: 'Comments',
+  composer: 'Composer',
+  copyright: 'Copyright',
+  publisher: 'Publisher',
+  bpm: 'BPM',
+  key: 'Key',
+  length: 'Length',
+  encoder: 'Encoder',
+  albumArtist: 'Album Artist',
+  conductor: 'Conductor',
+  discNumber: 'Disc',
+  isrc: 'ISRC',
+  lyrics: 'Lyrics',
+  url: 'URL'
+};
+
 async function extractMetadata(fileItem) {
   if (!fileItem.handle || fileItem.type !== 'file') return;
   if (fileItem.metadata) return; // Already extracted
@@ -704,7 +761,7 @@ async function extractMetadata(fileItem) {
     
     // Try to read ID3 tags from MP3 files
     if (file.name.toLowerCase().endsWith('.mp3')) {
-      const buffer = await file.slice(0, 128 * 1024).arrayBuffer(); // Read first 128KB
+      const buffer = await file.slice(0, 256 * 1024).arrayBuffer(); // Read first 256KB for more metadata
       const view = new DataView(buffer);
       
       // Check for ID3v2 header
@@ -748,23 +805,40 @@ async function extractMetadata(fileItem) {
           const frameStart = offset + 10;
           const frameEnd = Math.min(frameStart + frameSize, buffer.byteLength);
           
-          if (frameId === 'TIT2' || frameId === 'TPE1' || frameId === 'TALB') {
+          // Check if this is a frame we want to extract
+          const metadataField = ID3_FRAME_MAP[frameId];
+          if (metadataField) {
             const encoding = view.getUint8(frameStart);
             let text = '';
+            let dataStart = frameStart + 1;
+            
+            // For COMM (comments) frame, skip language code and description
+            if (frameId === 'COMM' || frameId === 'USLT') {
+              dataStart = frameStart + 4; // Skip encoding + 3-byte language
+              // Skip description (null-terminated)
+              while (dataStart < frameEnd && view.getUint8(dataStart) !== 0) {
+                dataStart++;
+              }
+              dataStart++; // Skip the null terminator
+            }
             
             if (encoding === 0 || encoding === 3) {
               // ISO-8859-1 or UTF-8
-              for (let i = frameStart + 1; i < frameEnd; i++) {
+              for (let i = dataStart; i < frameEnd; i++) {
                 const char = view.getUint8(i);
                 if (char === 0) break;
                 text += String.fromCharCode(char);
               }
             } else if (encoding === 1 || encoding === 2) {
               // UTF-16
-              let start = frameStart + 1;
+              let start = dataStart;
               // Skip BOM if present
-              if (view.getUint8(start) === 0xFF || view.getUint8(start) === 0xFE) {
-                start += 2;
+              if (start < frameEnd - 1) {
+                const bom1 = view.getUint8(start);
+                const bom2 = view.getUint8(start + 1);
+                if ((bom1 === 0xFF && bom2 === 0xFE) || (bom1 === 0xFE && bom2 === 0xFF)) {
+                  start += 2;
+                }
               }
               for (let i = start; i < frameEnd - 1; i += 2) {
                 const code = view.getUint16(i, true);
@@ -773,9 +847,7 @@ async function extractMetadata(fileItem) {
               }
             }
             
-            if (frameId === 'TIT2') fileItem.metadata.title = text.trim();
-            else if (frameId === 'TPE1') fileItem.metadata.artist = text.trim();
-            else if (frameId === 'TALB') fileItem.metadata.album = text.trim();
+            fileItem.metadata[metadataField] = text.trim();
           }
           
           offset += 10 + frameSize;
@@ -806,15 +878,18 @@ function renderFileList() {
   
   let items = state.currentFiles;
   
-  // Apply search filter
+  // Apply search filter (searches all metadata fields)
   if (state.searchQuery) {
     const query = state.searchQuery.toLowerCase();
     items = items.filter(f => {
       if (f.name.toLowerCase().includes(query)) return true;
       if (f.metadata) {
-        if (f.metadata.title && f.metadata.title.toLowerCase().includes(query)) return true;
-        if (f.metadata.artist && f.metadata.artist.toLowerCase().includes(query)) return true;
-        if (f.metadata.album && f.metadata.album.toLowerCase().includes(query)) return true;
+        // Search all metadata fields
+        for (const value of Object.values(f.metadata)) {
+          if (value && typeof value === 'string' && value.toLowerCase().includes(query)) {
+            return true;
+          }
+        }
       }
       return false;
     });
@@ -871,7 +946,11 @@ function renderFileList() {
       div.addEventListener('click', () => navigateToFolder(item.name));
       div.addEventListener('dblclick', () => navigateToFolder(item.name));
     } else {
-      div.addEventListener('click', () => selectFile(div, item));
+      div.addEventListener('click', () => {
+        selectFile(div, item);
+        // Update the metadata preview panel
+        updateMetadataPreview(item);
+      });
       div.addEventListener('dblclick', () => loadToFirstEmptyDeck(item));
       
       div.addEventListener('dragstart', (e) => {
@@ -916,6 +995,53 @@ function escapeHtml(text) {
   const div = document.createElement('div');
   div.textContent = text;
   return div.innerHTML;
+}
+
+// Update the fixed metadata preview panel at the bottom
+function updateMetadataPreview(item) {
+  if (!elements.metadataPreviewPanel) return;
+  
+  // Update filename
+  elements.metadataPreviewFilename.textContent = item.name;
+  
+  const metadata = item.metadata || {};
+  
+  // Get all metadata fields (including main columns for completeness)
+  const allFields = Object.entries(metadata)
+    .filter(([key, value]) => value)
+    .map(([key, value]) => {
+      const label = METADATA_LABELS[key] || key;
+      return { key, label, value };
+    });
+  
+  // If no metadata, show a message
+  if (allFields.length === 0) {
+    elements.metadataPreviewContent.innerHTML = '<div class="metadata-empty">No metadata available</div>';
+    return;
+  }
+  
+  // Create a grid of metadata fields
+  let html = '<div class="metadata-grid">';
+  allFields.forEach(({ label, value }) => {
+    // Truncate very long values (like lyrics)
+    const displayValue = value.length > 150 ? value.substring(0, 150) + '...' : value;
+    html += `
+      <div class="metadata-field">
+        <span class="metadata-label">${escapeHtml(label)}:</span>
+        <span class="metadata-value" title="${escapeHtml(value)}">${escapeHtml(displayValue)}</span>
+      </div>
+    `;
+  });
+  html += '</div>';
+  
+  elements.metadataPreviewContent.innerHTML = html;
+}
+
+// Clear the metadata preview panel
+function clearMetadataPreview() {
+  if (!elements.metadataPreviewPanel) return;
+  elements.metadataPreviewFilename.textContent = 'Select a file to view metadata';
+  elements.metadataPreviewContent.innerHTML = '';
 }
 
 // Column resizing state
