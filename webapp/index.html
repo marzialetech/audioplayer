@@ -16,9 +16,18 @@
         <h1>rockstar v1.2</h1>
       </div>
       <div class="master-controls">
-        <label>Master Volume:</label>
-        <input type="range" id="masterVolume" min="0" max="100" value="100" class="master-volume-slider">
-        <span id="masterVolumeValue">100%</span>
+        <div class="keyboard-toggle">
+          <label class="toggle-label" for="keyboardToggle">Enable keyboard shortcuts</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="keyboardToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="master-volume-control">
+          <label>Master Volume:</label>
+          <input type="range" id="masterVolume" min="0" max="100" value="100" class="master-volume-slider">
+          <span id="masterVolumeValue">100%</span>
+        </div>
       </div>
     </header>
 
@@ -584,10 +593,29 @@
         <div class="search-container">
           <input type="text" id="searchInput" placeholder="Search audio files..." class="search-input">
           <button id="btnSearch" class="btn-search">Search</button>
+          <button id="btnResetColumns" class="btn-reset-columns" title="Reset column widths">↔</button>
         </div>
 
         <!-- File List -->
         <div class="file-list-container">
+          <div class="file-list-header" id="fileListHeader">
+            <div class="file-header-col file-col-name sortable active" data-sort="name">
+              <span>Name</span>
+              <span class="sort-indicator">▲</span>
+            </div>
+            <div class="file-header-col file-col-title sortable" data-sort="title">
+              <span>Title</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-col file-col-artist sortable" data-sort="artist">
+              <span>Artist</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-col file-col-album sortable" data-sort="album">
+              <span>Album</span>
+              <span class="sort-indicator"></span>
+            </div>
+          </div>
           <div class="file-list" id="fileList">
             <p class="file-list-empty">Select a directory to browse audio files.</p>
           </div>

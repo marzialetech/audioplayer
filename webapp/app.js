@@ -41,7 +41,10 @@ const state = {
     index: 0    // Index within the current area
   },
   focusFirstFileAfterNav: false, // Flag to focus first file after folder navigation
-  debugMode: false // Debug mode to show keystrokes
+  debugMode: false, // Debug mode to show keystrokes
+  keyboardEnabled: false, // Toggle for enabling/disabling keyboard shortcuts (default OFF)
+  sortColumn: 'name', // Current sort column: 'name', 'title', 'artist', 'album'
+  sortDirection: 'asc' // Sort direction: 'asc' or 'desc'
 };
 
 // Initialize decks 1-20
@@ -75,7 +78,10 @@ const elements = {
   btnLayoutToggle: document.getElementById('btnLayoutToggle'),
   audioDecksPanel: document.querySelector('.audio-decks-panel'),
   fileAssignMessage: document.getElementById('fileAssignMessage'),
-  debugOverlay: document.getElementById('debugOverlay')
+  debugOverlay: document.getElementById('debugOverlay'),
+  keyboardToggle: document.getElementById('keyboardToggle'),
+  fileListHeader: document.getElementById('fileListHeader'),
+  btnResetColumns: document.getElementById('btnResetColumns')
 };
 
 // Initialize Application
@@ -240,6 +246,23 @@ function setupEventListeners() {
     elements.masterVolumeValue.textContent = `${e.target.value}%`;
     updateAllDeckVolumes();
   });
+  
+  // Keyboard toggle
+  if (elements.keyboardToggle) {
+    elements.keyboardToggle.addEventListener('change', (e) => {
+      state.keyboardEnabled = e.target.checked;
+      // Clear any keyboard focus when disabling
+      if (!state.keyboardEnabled) {
+        clearKeyboardFocus();
+        // Hide debug overlay if it was showing
+        if (elements.debugOverlay) {
+          elements.debugOverlay.classList.remove('visible');
+        }
+        state.debugMode = false;
+      }
+      setStatus(state.keyboardEnabled ? 'Keyboard shortcuts enabled' : 'Keyboard shortcuts disabled');
+    });
+  }
   
   // Layout toggle
   elements.btnLayoutToggle.addEventListener('click', toggleLayout);
@@ -417,6 +440,35 @@ function setupEventListeners() {
     }
   });
   
+  // File list column sorting
+  if (elements.fileListHeader) {
+    elements.fileListHeader.querySelectorAll('.sortable').forEach(col => {
+      col.addEventListener('click', (e) => {
+        // Don't sort if clicking on resize handle
+        if (e.target.classList.contains('col-resize-handle')) return;
+        
+        const sortKey = col.dataset.sort;
+        if (state.sortColumn === sortKey) {
+          // Toggle direction
+          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortColumn = sortKey;
+          state.sortDirection = 'asc';
+        }
+        updateSortIndicators();
+        renderFileList();
+      });
+    });
+    
+    // Setup column resizing
+    setupColumnResizing();
+  }
+  
+  // Reset column widths button
+  if (elements.btnResetColumns) {
+    elements.btnResetColumns.addEventListener('click', resetColumnWidths);
+  }
+  
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboard);
 }
@@ -529,13 +581,171 @@ async function loadDirectoryContents(dirHandle, subPath = []) {
     
     renderFileList();
     setStatus(`Loaded ${files.length} audio files, ${folders.length} folders`);
+    
+    // Extract metadata in background
+    extractAllMetadata();
   } catch (err) {
     console.error('Error loading directory:', err);
     setStatus('Error loading directory');
   }
 }
 
-// Render file list
+// Update sort indicators in the column headers
+function updateSortIndicators() {
+  if (!elements.fileListHeader) return;
+  
+  elements.fileListHeader.querySelectorAll('.sortable').forEach(col => {
+    const sortKey = col.dataset.sort;
+    const indicator = col.querySelector('.sort-indicator');
+    
+    if (sortKey === state.sortColumn) {
+      col.classList.add('active');
+      indicator.textContent = state.sortDirection === 'asc' ? '▲' : '▼';
+    } else {
+      col.classList.remove('active');
+      indicator.textContent = '';
+    }
+  });
+}
+
+// Sort items based on current sort column and direction
+function sortItems(items) {
+  const sorted = [...items];
+  const col = state.sortColumn;
+  const dir = state.sortDirection === 'asc' ? 1 : -1;
+  
+  sorted.sort((a, b) => {
+    // Folders always come first
+    if (a.type === 'folder' && b.type !== 'folder') return -1;
+    if (a.type !== 'folder' && b.type === 'folder') return 1;
+    
+    let valA, valB;
+    
+    if (col === 'name') {
+      valA = a.name.toLowerCase();
+      valB = b.name.toLowerCase();
+    } else {
+      // For metadata columns
+      valA = (a.metadata && a.metadata[col]) ? a.metadata[col].toLowerCase() : '';
+      valB = (b.metadata && b.metadata[col]) ? b.metadata[col].toLowerCase() : '';
+    }
+    
+    if (valA < valB) return -1 * dir;
+    if (valA > valB) return 1 * dir;
+    return 0;
+  });
+  
+  return sorted;
+}
+
+// Extract metadata from an audio file
+async function extractMetadata(fileItem) {
+  if (!fileItem.handle || fileItem.type !== 'file') return;
+  if (fileItem.metadata) return; // Already extracted
+  
+  try {
+    const file = await fileItem.handle.getFile();
+    fileItem.metadata = { title: '', artist: '', album: '' };
+    
+    // Try to read ID3 tags from MP3 files
+    if (file.name.toLowerCase().endsWith('.mp3')) {
+      const buffer = await file.slice(0, 128 * 1024).arrayBuffer(); // Read first 128KB
+      const view = new DataView(buffer);
+      
+      // Check for ID3v2 header
+      if (view.getUint8(0) === 0x49 && view.getUint8(1) === 0x44 && view.getUint8(2) === 0x33) {
+        // ID3v2 found - parse it
+        const version = view.getUint8(3);
+        const size = ((view.getUint8(6) & 0x7f) << 21) |
+                     ((view.getUint8(7) & 0x7f) << 14) |
+                     ((view.getUint8(8) & 0x7f) << 7) |
+                     (view.getUint8(9) & 0x7f);
+        
+        let offset = 10;
+        const headerSize = Math.min(size + 10, buffer.byteLength);
+        
+        while (offset < headerSize - 10) {
+          // Read frame header
+          let frameId = '';
+          for (let i = 0; i < 4; i++) {
+            const char = view.getUint8(offset + i);
+            if (char === 0) break;
+            frameId += String.fromCharCode(char);
+          }
+          
+          if (!frameId || frameId[0] === '\0') break;
+          
+          let frameSize;
+          if (version === 4) {
+            frameSize = ((view.getUint8(offset + 4) & 0x7f) << 21) |
+                        ((view.getUint8(offset + 5) & 0x7f) << 14) |
+                        ((view.getUint8(offset + 6) & 0x7f) << 7) |
+                        (view.getUint8(offset + 7) & 0x7f);
+          } else {
+            frameSize = (view.getUint8(offset + 4) << 24) |
+                        (view.getUint8(offset + 5) << 16) |
+                        (view.getUint8(offset + 6) << 8) |
+                        view.getUint8(offset + 7);
+          }
+          
+          if (frameSize <= 0 || frameSize > headerSize) break;
+          
+          const frameStart = offset + 10;
+          const frameEnd = Math.min(frameStart + frameSize, buffer.byteLength);
+          
+          if (frameId === 'TIT2' || frameId === 'TPE1' || frameId === 'TALB') {
+            const encoding = view.getUint8(frameStart);
+            let text = '';
+            
+            if (encoding === 0 || encoding === 3) {
+              // ISO-8859-1 or UTF-8
+              for (let i = frameStart + 1; i < frameEnd; i++) {
+                const char = view.getUint8(i);
+                if (char === 0) break;
+                text += String.fromCharCode(char);
+              }
+            } else if (encoding === 1 || encoding === 2) {
+              // UTF-16
+              let start = frameStart + 1;
+              // Skip BOM if present
+              if (view.getUint8(start) === 0xFF || view.getUint8(start) === 0xFE) {
+                start += 2;
+              }
+              for (let i = start; i < frameEnd - 1; i += 2) {
+                const code = view.getUint16(i, true);
+                if (code === 0) break;
+                text += String.fromCharCode(code);
+              }
+            }
+            
+            if (frameId === 'TIT2') fileItem.metadata.title = text.trim();
+            else if (frameId === 'TPE1') fileItem.metadata.artist = text.trim();
+            else if (frameId === 'TALB') fileItem.metadata.album = text.trim();
+          }
+          
+          offset += 10 + frameSize;
+        }
+      }
+    }
+  } catch (err) {
+    console.log('Could not extract metadata:', err);
+    fileItem.metadata = { title: '', artist: '', album: '' };
+  }
+}
+
+// Extract metadata for all files in the current view
+async function extractAllMetadata() {
+  const audioFiles = state.currentFiles.filter(f => f.type === 'file');
+  
+  // Extract in batches to avoid blocking
+  for (const file of audioFiles) {
+    await extractMetadata(file);
+  }
+  
+  // Re-render after extraction
+  renderFileList();
+}
+
 function renderFileList() {
   elements.fileList.innerHTML = '';
   
@@ -543,16 +753,34 @@ function renderFileList() {
   
   // Apply search filter
   if (state.searchQuery) {
-    items = items.filter(f => 
-      f.name.toLowerCase().includes(state.searchQuery.toLowerCase())
-    );
+    const query = state.searchQuery.toLowerCase();
+    items = items.filter(f => {
+      if (f.name.toLowerCase().includes(query)) return true;
+      if (f.metadata) {
+        if (f.metadata.title && f.metadata.title.toLowerCase().includes(query)) return true;
+        if (f.metadata.artist && f.metadata.artist.toLowerCase().includes(query)) return true;
+        if (f.metadata.album && f.metadata.album.toLowerCase().includes(query)) return true;
+      }
+      return false;
+    });
   }
+  
+  // Sort items
+  items = sortItems(items);
   
   // Add parent folder navigation if in subfolder
   if (state.currentPath.length > 0) {
     const parentItem = document.createElement('div');
     parentItem.className = 'file-item folder-item';
-    parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">Go Back</span>`;
+    parentItem.innerHTML = `
+      <div class="file-item-col file-col-name">
+        <span class="file-icon">📁</span>
+        <span class="file-name">Go Back</span>
+      </div>
+      <div class="file-item-col file-col-title"></div>
+      <div class="file-item-col file-col-artist"></div>
+      <div class="file-item-col file-col-album"></div>
+    `;
     parentItem.addEventListener('click', () => navigateUp());
     elements.fileList.appendChild(parentItem);
   }
@@ -570,7 +798,19 @@ function renderFileList() {
     div.draggable = item.type === 'file';
     
     const icon = item.type === 'folder' ? '📁' : '🎵';
-    div.innerHTML = `<span class="file-icon">${icon}</span><span class="file-name">${item.name}</span>`;
+    const title = item.metadata?.title || '';
+    const artist = item.metadata?.artist || '';
+    const album = item.metadata?.album || '';
+    
+    div.innerHTML = `
+      <div class="file-item-col file-col-name">
+        <span class="file-icon">${icon}</span>
+        <span class="file-name">${item.name}</span>
+      </div>
+      <div class="file-item-col file-col-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+      <div class="file-item-col file-col-artist" title="${escapeHtml(artist)}">${escapeHtml(artist)}</div>
+      <div class="file-item-col file-col-album" title="${escapeHtml(album)}">${escapeHtml(album)}</div>
+    `;
     
     if (item.type === 'folder') {
       div.addEventListener('click', () => navigateToFolder(item.name));
@@ -602,6 +842,9 @@ function renderFileList() {
     elements.fileList.appendChild(div);
   });
   
+  // Apply saved column widths to new rows
+  applyColumnWidthsToRows();
+  
   // Check if we should focus the first file after navigation
   if (state.focusFirstFileAfterNav) {
     state.focusFirstFileAfterNav = false;
@@ -610,6 +853,174 @@ function renderFileList() {
       setKeyboardFocus('files', 0);
     }
   }
+}
+
+// Helper to escape HTML
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Column resizing state
+const columnResizeState = {
+  isResizing: false,
+  currentHandle: null,
+  currentCol: null,
+  startX: 0,
+  startWidth: 0
+};
+
+// Setup column resizing functionality
+function setupColumnResizing() {
+  const resizableCols = ['name', 'title', 'artist']; // album is flex, doesn't need resize
+  
+  resizableCols.forEach(colName => {
+    const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
+    if (!headerCol) return;
+    
+    // Create resize handle
+    const handle = document.createElement('div');
+    handle.className = 'col-resize-handle';
+    handle.dataset.col = colName;
+    headerCol.appendChild(handle);
+    
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startColumnResize(e, colName, headerCol);
+    });
+  });
+  
+  // Load saved column widths
+  loadColumnWidths();
+}
+
+function startColumnResize(e, colName, headerCol) {
+  columnResizeState.isResizing = true;
+  columnResizeState.currentCol = colName;
+  columnResizeState.startX = e.clientX;
+  columnResizeState.startWidth = headerCol.offsetWidth;
+  
+  const handle = headerCol.querySelector('.col-resize-handle');
+  if (handle) handle.classList.add('resizing');
+  
+  document.querySelector('.file-list-container').classList.add('resizing');
+  
+  document.addEventListener('mousemove', handleColumnResize);
+  document.addEventListener('mouseup', stopColumnResize);
+}
+
+function handleColumnResize(e) {
+  if (!columnResizeState.isResizing) return;
+  
+  const diff = e.clientX - columnResizeState.startX;
+  const newWidth = Math.max(50, columnResizeState.startWidth + diff);
+  
+  setColumnWidth(columnResizeState.currentCol, newWidth);
+}
+
+function stopColumnResize() {
+  if (!columnResizeState.isResizing) return;
+  
+  columnResizeState.isResizing = false;
+  
+  document.querySelectorAll('.col-resize-handle.resizing').forEach(h => {
+    h.classList.remove('resizing');
+  });
+  
+  document.querySelector('.file-list-container')?.classList.remove('resizing');
+  
+  document.removeEventListener('mousemove', handleColumnResize);
+  document.removeEventListener('mouseup', stopColumnResize);
+  
+  // Save column widths
+  saveColumnWidths();
+}
+
+function setColumnWidth(colName, width) {
+  // Update header column
+  const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
+  if (headerCol) {
+    headerCol.style.width = `${width}px`;
+  }
+  
+  // Update all file rows
+  document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
+    col.style.width = `${width}px`;
+  });
+}
+
+function saveColumnWidths() {
+  const widths = {};
+  ['name', 'title', 'artist'].forEach(colName => {
+    const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
+    if (headerCol) {
+      widths[colName] = headerCol.offsetWidth;
+    }
+  });
+  localStorage.setItem('fileListColumnWidths', JSON.stringify(widths));
+}
+
+function loadColumnWidths() {
+  try {
+    const saved = localStorage.getItem('fileListColumnWidths');
+    if (saved) {
+      const widths = JSON.parse(saved);
+      Object.entries(widths).forEach(([colName, width]) => {
+        setColumnWidth(colName, width);
+      });
+    }
+  } catch (err) {
+    console.log('Could not load column widths:', err);
+  }
+}
+
+// Apply saved column widths to newly rendered file rows
+function applyColumnWidthsToRows() {
+  try {
+    const saved = localStorage.getItem('fileListColumnWidths');
+    if (saved) {
+      const widths = JSON.parse(saved);
+      Object.entries(widths).forEach(([colName, width]) => {
+        document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
+          col.style.width = `${width}px`;
+        });
+      });
+    }
+  } catch (err) {
+    // Ignore
+  }
+}
+
+// Default column widths
+const DEFAULT_COLUMN_WIDTHS = {
+  name: 200,
+  title: 120,
+  artist: 120
+};
+
+// Reset column widths to defaults
+function resetColumnWidths() {
+  // Clear saved widths
+  localStorage.removeItem('fileListColumnWidths');
+  
+  // Apply default widths
+  Object.entries(DEFAULT_COLUMN_WIDTHS).forEach(([colName, width]) => {
+    // Reset header
+    const headerCol = elements.fileListHeader?.querySelector(`[data-sort="${colName}"]`);
+    if (headerCol) {
+      headerCol.style.width = `${width}px`;
+    }
+    
+    // Reset file rows
+    document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
+      col.style.width = `${width}px`;
+    });
+  });
+  
+  setStatus('Column widths reset to default');
 }
 
 // Navigate to a subfolder
@@ -1557,6 +1968,9 @@ function handleFocusedItemAction(action) {
 function handleKeyboard(e) {
   // Don't trigger shortcuts when typing in input fields
   if (e.target.matches('input')) return;
+  
+  // If keyboard shortcuts are disabled, exit early
+  if (!state.keyboardEnabled) return;
   
   // Show debug info if debug mode is on
   if (state.debugMode && elements.debugOverlay) {
