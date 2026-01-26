@@ -1221,13 +1221,30 @@ section h2 {
   border-right: none;
 }
 
+/* Metadata resize handle */
+.metadata-resize-handle {
+  height: 6px;
+  background: var(--border-color);
+  cursor: ns-resize;
+  flex-shrink: 0;
+  margin: 4px 0;
+  border-radius: 3px;
+  transition: background 0.2s;
+}
+
+.metadata-resize-handle:hover,
+.metadata-resize-handle.resizing {
+  background: var(--accent-orange);
+}
+
 /* Fixed Metadata Preview Panel */
 .metadata-preview-panel {
   background: linear-gradient(135deg, var(--bg-panel), var(--bg-item));
   border: 1px solid var(--border-color);
   border-radius: 4px;
-  margin-top: 8px;
-  max-height: 120px;
+  height: 100px;
+  min-height: 60px;
+  max-height: 300px;
   overflow-y: auto;
   flex-shrink: 0;
 }

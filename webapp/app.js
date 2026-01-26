@@ -85,7 +85,8 @@ const elements = {
   btnResetColumns: document.getElementById('btnResetColumns'),
   metadataPreviewPanel: document.getElementById('metadataPreviewPanel'),
   metadataPreviewFilename: document.getElementById('metadataPreviewFilename'),
-  metadataPreviewContent: document.getElementById('metadataPreviewContent')
+  metadataPreviewContent: document.getElementById('metadataPreviewContent'),
+  metadataResizeHandle: document.getElementById('metadataResizeHandle')
 };
 
 // Initialize Application
@@ -525,6 +526,11 @@ function setupEventListeners() {
   // Reset column widths button
   if (elements.btnResetColumns) {
     elements.btnResetColumns.addEventListener('click', resetColumnWidths);
+  }
+  
+  // Metadata panel resize handle
+  if (elements.metadataResizeHandle && elements.metadataPreviewPanel) {
+    setupMetadataPanelResize();
   }
   
   // Keyboard shortcuts
@@ -1202,6 +1208,67 @@ function resetColumnWidths() {
   });
   
   setStatus('Column widths reset to default');
+}
+
+// Metadata panel resize state
+const metadataResizeState = {
+  isResizing: false,
+  startY: 0,
+  startHeight: 0
+};
+
+// Setup metadata panel resize functionality
+function setupMetadataPanelResize() {
+  const handle = elements.metadataResizeHandle;
+  const panel = elements.metadataPreviewPanel;
+  
+  // Load saved height
+  const savedHeight = localStorage.getItem('metadataPanelHeight');
+  if (savedHeight) {
+    panel.style.height = `${savedHeight}px`;
+  }
+  
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    metadataResizeState.isResizing = true;
+    metadataResizeState.startY = e.clientY;
+    metadataResizeState.startHeight = panel.offsetHeight;
+    
+    handle.classList.add('resizing');
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    
+    document.addEventListener('mousemove', handleMetadataPanelResize);
+    document.addEventListener('mouseup', stopMetadataPanelResize);
+  });
+}
+
+function handleMetadataPanelResize(e) {
+  if (!metadataResizeState.isResizing) return;
+  
+  const panel = elements.metadataPreviewPanel;
+  // Moving up increases height, moving down decreases
+  const diff = metadataResizeState.startY - e.clientY;
+  const newHeight = Math.max(60, Math.min(300, metadataResizeState.startHeight + diff));
+  
+  panel.style.height = `${newHeight}px`;
+}
+
+function stopMetadataPanelResize() {
+  if (!metadataResizeState.isResizing) return;
+  
+  metadataResizeState.isResizing = false;
+  
+  elements.metadataResizeHandle.classList.remove('resizing');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  
+  document.removeEventListener('mousemove', handleMetadataPanelResize);
+  document.removeEventListener('mouseup', stopMetadataPanelResize);
+  
+  // Save the height
+  const height = elements.metadataPreviewPanel.offsetHeight;
+  localStorage.setItem('metadataPanelHeight', height);
 }
 
 // Navigate to a subfolder
