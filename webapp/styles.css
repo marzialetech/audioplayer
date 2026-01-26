@@ -1330,6 +1330,24 @@ section h2 {
   background: rgba(0, 217, 255, 0.1) !important;
 }
 
+/* Dragging state for decks and hot buttons */
+.audio-deck.dragging,
+.hot-button.dragging {
+  opacity: 0.5;
+  transform: scale(0.98);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.4);
+}
+
+.audio-deck[draggable="true"],
+.hot-button[draggable="true"] {
+  cursor: grab;
+}
+
+.audio-deck[draggable="true"]:active,
+.hot-button[draggable="true"]:active {
+  cursor: grabbing;
+}
+
 /* Input Range Styling */
 input[type="range"] {
   -webkit-appearance: none;

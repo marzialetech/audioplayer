@@ -33,6 +33,7 @@ const state = {
   masterVolume: 1,
   searchQuery: '',
   draggingFile: null, // Store file being dragged (handles can't be serialized)
+  draggingDeckSlot: null, // Store deck/hot button slot being dragged for reordering
   layout: '20x1', // '20x1' or '10x2'
   clickToAssignMode: false, // True when a file is selected and waiting to be assigned
   slotInput: '', // Stores typed number for quick slot assignment (1-20)
@@ -366,6 +367,26 @@ function setupEventListeners() {
       clearDeck(btn.dataset.slot);
     });
     
+    // Make hot buttons draggable for reordering
+    btn.draggable = true;
+    
+    btn.addEventListener('dragstart', (e) => {
+      const slot = parseInt(btn.dataset.slot);
+      // Only allow dragging if the slot has a file
+      if (state.decks[slot].file) {
+        state.draggingDeckSlot = slot;
+        e.dataTransfer.effectAllowed = 'move';
+        btn.classList.add('dragging');
+      } else {
+        e.preventDefault();
+      }
+    });
+    
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('dragging');
+      state.draggingDeckSlot = null;
+    });
+    
     // Drag and drop for hot buttons
     btn.addEventListener('dragover', (e) => {
       e.preventDefault();
@@ -379,9 +400,16 @@ function setupEventListeners() {
     btn.addEventListener('drop', (e) => {
       e.preventDefault();
       btn.classList.remove('drag-over');
-      // Use the stored dragging file (handles can't be serialized to JSON)
-      if (state.draggingFile) {
-        loadToDeck(btn.dataset.slot, state.draggingFile);
+      const targetSlot = parseInt(btn.dataset.slot);
+      
+      // Check if we're swapping decks
+      if (state.draggingDeckSlot !== null) {
+        swapDecks(state.draggingDeckSlot, targetSlot);
+        state.draggingDeckSlot = null;
+      }
+      // Otherwise load a file from file browser
+      else if (state.draggingFile) {
+        loadToDeck(targetSlot, state.draggingFile);
       }
     });
   });
@@ -402,6 +430,26 @@ function setupEventListeners() {
       }
     });
     
+    // Make audio decks draggable for reordering
+    deck.draggable = true;
+    
+    deck.addEventListener('dragstart', (e) => {
+      const deckNum = parseInt(deck.dataset.deck);
+      // Only allow dragging if the deck has a file
+      if (state.decks[deckNum].file) {
+        state.draggingDeckSlot = deckNum;
+        e.dataTransfer.effectAllowed = 'move';
+        deck.classList.add('dragging');
+      } else {
+        e.preventDefault();
+      }
+    });
+    
+    deck.addEventListener('dragend', () => {
+      deck.classList.remove('dragging');
+      state.draggingDeckSlot = null;
+    });
+    
     deck.addEventListener('dragover', (e) => {
       e.preventDefault();
       deck.classList.add('drag-over');
@@ -414,9 +462,16 @@ function setupEventListeners() {
     deck.addEventListener('drop', (e) => {
       e.preventDefault();
       deck.classList.remove('drag-over');
-      // Use the stored dragging file (handles can't be serialized to JSON)
-      if (state.draggingFile) {
-        loadToDeck(deck.dataset.deck, state.draggingFile);
+      const targetSlot = parseInt(deck.dataset.deck);
+      
+      // Check if we're swapping decks
+      if (state.draggingDeckSlot !== null) {
+        swapDecks(state.draggingDeckSlot, targetSlot);
+        state.draggingDeckSlot = null;
+      }
+      // Otherwise load a file from file browser
+      else if (state.draggingFile) {
+        loadToDeck(targetSlot, state.draggingFile);
       }
     });
   });
@@ -1455,6 +1510,45 @@ function clearDeck(deckNum) {
   updateDeckState(deckNum, 'empty');
   updateHotButtonDisplay(deckNum);
   updateQueueButtonState(deckNum);
+}
+
+// Swap contents between two decks
+function swapDecks(slot1, slot2) {
+  slot1 = parseInt(slot1);
+  slot2 = parseInt(slot2);
+  
+  if (slot1 === slot2) return;
+  
+  const deck1 = state.decks[slot1];
+  const deck2 = state.decks[slot2];
+  
+  // Stop both decks if playing
+  if (deck1.playing) stopDeck(slot1);
+  if (deck2.playing) stopDeck(slot2);
+  
+  // Store references to the files
+  const file1 = deck1.file;
+  const file2 = deck2.file;
+  const queued1 = deck1.queued;
+  const queued2 = deck2.queued;
+  
+  // Clear both decks first
+  clearDeck(slot1);
+  clearDeck(slot2);
+  
+  // Load files into swapped positions
+  if (file2) {
+    loadToDeck(slot1, file2);
+    state.decks[slot1].queued = queued2;
+    updateQueueButtonState(slot1);
+  }
+  if (file1) {
+    loadToDeck(slot2, file1);
+    state.decks[slot2].queued = queued1;
+    updateQueueButtonState(slot2);
+  }
+  
+  setStatus(`Swapped slots ${slot1} and ${slot2}`);
 }
 
 // Toggle queue state for a deck
