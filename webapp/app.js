@@ -1091,7 +1091,7 @@ function renderFileList() {
         <span class="file-icon">📁</span>
         <span class="file-name">Go Back</span>
       </div>
-      <div class="file-item-col file-col-length"></div>
+      <div class="file-item-col file-col-duration"></div>
       <div class="file-item-col file-col-title"></div>
       <div class="file-item-col file-col-artist"></div>
       <div class="file-item-col file-col-album"></div>
@@ -1123,7 +1123,7 @@ function renderFileList() {
         <span class="file-icon">${icon}</span>
         <span class="file-name">${item.name}</span>
       </div>
-      <div class="file-item-col file-col-length">${duration}</div>
+      <div class="file-item-col file-col-duration">${duration}</div>
       <div class="file-item-col file-col-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
       <div class="file-item-col file-col-artist" title="${escapeHtml(artist)}">${escapeHtml(artist)}</div>
       <div class="file-item-col file-col-album" title="${escapeHtml(album)}">${escapeHtml(album)}</div>
@@ -1244,7 +1244,7 @@ const columnResizeState = {
 
 // Setup column resizing functionality
 function setupColumnResizing() {
-  const resizableCols = ['name', 'length', 'title', 'artist']; // album is flex, doesn't need resize
+  const resizableCols = ['name', 'duration', 'title', 'artist']; // album is flex, doesn't need resize
   
   resizableCols.forEach(colName => {
     const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
@@ -1324,7 +1324,7 @@ function setColumnWidth(colName, width) {
 
 function saveColumnWidths() {
   const widths = {};
-  ['name', 'title', 'artist'].forEach(colName => {
+  ['name', 'duration', 'title', 'artist'].forEach(colName => {
     const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
     if (headerCol) {
       widths[colName] = headerCol.offsetWidth;
@@ -1367,6 +1367,7 @@ function applyColumnWidthsToRows() {
 // Default column widths
 const DEFAULT_COLUMN_WIDTHS = {
   name: 200,
+  duration: 75,
   title: 120,
   artist: 120
 };
