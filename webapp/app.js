@@ -711,6 +711,7 @@ const ID3_FRAME_MAP = {
   'TIT2': 'title',
   'TPE1': 'artist',
   'TALB': 'album',
+  'TIT1': 'grouping',
   'TCON': 'genre',
   'TRCK': 'track',
   'TYER': 'year',
@@ -729,7 +730,27 @@ const ID3_FRAME_MAP = {
   'TPOS': 'discNumber',
   'TSRC': 'isrc',
   'USLT': 'lyrics',
-  'WXXX': 'url'
+  'WXXX': 'url',
+  'TORY': 'originalYear',
+  'TOAL': 'originalAlbum',
+  'TOWN': 'fileOwner',
+  'TOPE': 'originalArtist',
+  'TEXT': 'lyricist',
+  'TSSE': 'encoderSettings'
+};
+
+// RIFF LIST-INFO chunk id to metadata field mapping (WAV native metadata)
+const RIFF_INFO_MAP = {
+  'INAM': 'title',
+  'IART': 'artist',
+  'IPRD': 'album',
+  'ICRD': 'date',
+  'ICMT': 'comments',
+  'IGNR': 'genre',
+  'ICOP': 'copyright',
+  'ISFT': 'encoder',
+  'ITRK': 'track',
+  'ISBJ': 'subject'
 };
 
 // Human-readable labels for metadata fields
@@ -737,6 +758,7 @@ const METADATA_LABELS = {
   title: 'Title',
   artist: 'Artist',
   album: 'Album',
+  grouping: 'Grouping',
   genre: 'Genre',
   track: 'Track',
   year: 'Year',
@@ -754,8 +776,183 @@ const METADATA_LABELS = {
   discNumber: 'Disc',
   isrc: 'ISRC',
   lyrics: 'Lyrics',
-  url: 'URL'
+  url: 'URL',
+  subject: 'Subject',
+  originalYear: 'Original Year',
+  originalAlbum: 'Original Album',
+  fileOwner: 'File Owner',
+  originalArtist: 'Original Artist',
+  lyricist: 'Lyricist',
+  encoderSettings: 'Encoder Settings'
 };
+
+// Parse ID3v2 tags from a DataView (view must start at the "ID3" header). Mutates metadataObj.
+function parseID3IntoMetadata(view, metadataObj) {
+  if (view.byteLength < 10) return;
+  if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) return;
+  const version = view.getUint8(3);
+  const size = ((view.getUint8(6) & 0x7f) << 21) |
+               ((view.getUint8(7) & 0x7f) << 14) |
+               ((view.getUint8(8) & 0x7f) << 7) |
+               (view.getUint8(9) & 0x7f);
+  let offset = 10;
+  const headerSize = Math.min(size + 10, view.byteLength);
+  while (offset < headerSize - 10) {
+    let frameId = '';
+    for (let i = 0; i < 4; i++) {
+      const c = view.getUint8(offset + i);
+      if (c === 0) break;
+      frameId += String.fromCharCode(c);
+    }
+    if (!frameId || frameId[0] === '\0') break;
+    let frameSize;
+    if (version === 4) {
+      frameSize = ((view.getUint8(offset + 4) & 0x7f) << 21) |
+                  ((view.getUint8(offset + 5) & 0x7f) << 14) |
+                  ((view.getUint8(offset + 6) & 0x7f) << 7) |
+                  (view.getUint8(offset + 7) & 0x7f);
+    } else {
+      frameSize = (view.getUint8(offset + 4) << 24) |
+                  (view.getUint8(offset + 5) << 16) |
+                  (view.getUint8(offset + 6) << 8) |
+                  view.getUint8(offset + 7);
+    }
+    if (frameSize <= 0 || frameSize > headerSize) break;
+    const frameStart = offset + 10;
+    const frameEnd = Math.min(frameStart + frameSize, view.byteLength);
+    const metadataField = ID3_FRAME_MAP[frameId];
+    if (metadataField) {
+      const encoding = view.getUint8(frameStart);
+      let text = '';
+      let dataStart = frameStart + 1;
+      if (frameId === 'COMM' || frameId === 'USLT') {
+        dataStart = frameStart + 4;
+        while (dataStart < frameEnd && view.getUint8(dataStart) !== 0) dataStart++;
+        dataStart++;
+      }
+      if (encoding === 0 || encoding === 3) {
+        for (let i = dataStart; i < frameEnd; i++) {
+          const char = view.getUint8(i);
+          if (char === 0) break;
+          text += String.fromCharCode(char);
+        }
+      } else if (encoding === 1 || encoding === 2) {
+        let start = dataStart;
+        if (start < frameEnd - 1 && ((view.getUint8(start) === 0xFF && view.getUint8(start + 1) === 0xFE) ||
+            (view.getUint8(start) === 0xFE && view.getUint8(start + 1) === 0xFF))) start += 2;
+        for (let i = start; i < frameEnd - 1; i += 2) {
+          const code = view.getUint16(i, true);
+          if (code === 0) break;
+          text += String.fromCharCode(code);
+        }
+      }
+      const trimmed = text.trim();
+      if (trimmed) metadataObj[metadataField] = trimmed;
+    }
+    offset += 10 + frameSize;
+  }
+}
+
+// Parse RIFF LIST-INFO chunk from WAV buffer (first 256KB). Mutates metadataObj.
+function parseRiffListInfo(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  if (view.byteLength < 12) return;
+  if (String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3)) !== 'RIFF') return;
+  let pos = 12;
+  while (pos < view.byteLength - 8) {
+    const chunkId = String.fromCharCode(view.getUint8(pos), view.getUint8(pos + 1), view.getUint8(pos + 2), view.getUint8(pos + 3));
+    const chunkSize = view.getUint32(pos + 4, true);
+    pos += 8;
+    if (chunkId === 'LIST' && chunkSize >= 4) {
+      const listType = String.fromCharCode(view.getUint8(pos), view.getUint8(pos + 1), view.getUint8(pos + 2), view.getUint8(pos + 3));
+      if (listType === 'INFO') {
+        let sub = pos + 4;
+        const listEnd = pos + chunkSize;
+        while (sub < listEnd - 8) {
+          const subId = String.fromCharCode(view.getUint8(sub), view.getUint8(sub + 1), view.getUint8(sub + 2), view.getUint8(sub + 3));
+          const subSize = view.getUint32(sub + 4, true);
+          sub += 8;
+          const field = RIFF_INFO_MAP[subId];
+          if (field && subSize > 0 && sub + subSize <= view.byteLength) {
+            let s = '';
+            for (let i = 0; i < subSize; i++) {
+              const b = view.getUint8(sub + i);
+              if (b === 0) break;
+              s += String.fromCharCode(b);
+            }
+            const trimmed = s.trim();
+            if (trimmed) metadataObj[field] = trimmed;
+          }
+          sub += (subSize + 1) & ~1;
+        }
+        return;
+      }
+    }
+    pos += (chunkSize + 1) & ~1;
+  }
+}
+
+// Scan buffer for LIST INFO chunk anywhere in the data (for WAV tail reads)
+function scanForListInfo(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  for (let i = 0; i <= view.byteLength - 12; i++) {
+    // Look for "LIST" followed by size and "INFO"
+    if (view.getUint8(i) === 0x4C && view.getUint8(i + 1) === 0x49 &&
+        view.getUint8(i + 2) === 0x53 && view.getUint8(i + 3) === 0x54) {
+      const chunkSize = view.getUint32(i + 4, true);
+      if (i + 8 + 4 <= view.byteLength &&
+          view.getUint8(i + 8) === 0x49 && view.getUint8(i + 9) === 0x4E &&
+          view.getUint8(i + 10) === 0x46 && view.getUint8(i + 11) === 0x4F) {
+        // Found LIST INFO
+        let sub = i + 12;
+        const listEnd = Math.min(i + 8 + chunkSize, view.byteLength);
+        while (sub < listEnd - 8) {
+          const subId = String.fromCharCode(view.getUint8(sub), view.getUint8(sub + 1),
+                                            view.getUint8(sub + 2), view.getUint8(sub + 3));
+          const subSize = view.getUint32(sub + 4, true);
+          sub += 8;
+          const field = RIFF_INFO_MAP[subId];
+          if (field && subSize > 0 && sub + subSize <= view.byteLength) {
+            let s = '';
+            for (let j = 0; j < subSize; j++) {
+              const b = view.getUint8(sub + j);
+              if (b === 0) break;
+              s += String.fromCharCode(b);
+            }
+            const trimmed = s.trim();
+            if (trimmed) metadataObj[field] = trimmed;
+          }
+          sub += (subSize + 1) & ~1;
+        }
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Scan buffer for "ID3 " or "id3 " RIFF chunk (Soundminer style) or raw ID3 header
+function scanForID3InWav(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  for (let i = 0; i <= view.byteLength - 10; i++) {
+    const b0 = view.getUint8(i), b1 = view.getUint8(i + 1), b2 = view.getUint8(i + 2), b3 = view.getUint8(i + 3);
+    // Check for "ID3 " or "id3 " RIFF chunk (uppercase 0x49 0x44 0x33 0x20 or lowercase 0x69 0x64 0x33 0x20)
+    if (((b0 === 0x49 && b1 === 0x44) || (b0 === 0x69 && b1 === 0x64)) && b2 === 0x33 && b3 === 0x20) {
+      const chunkSize = view.getUint32(i + 4, true);
+      if (i + 8 < view.byteLength && chunkSize > 10) {
+        // ID3v2 data starts after the chunk header
+        parseID3IntoMetadata(new DataView(buffer, i + 8), metadataObj);
+        return true;
+      }
+    }
+    // Check for raw ID3v2 header (0x49 0x44 0x33 = "ID3")
+    if (b0 === 0x49 && b1 === 0x44 && b2 === 0x33 && b3 !== 0x20) {
+      parseID3IntoMetadata(new DataView(buffer, i), metadataObj);
+      return true;
+    }
+  }
+  return false;
+}
 
 async function extractMetadata(fileItem) {
   if (!fileItem.handle || fileItem.type !== 'file') return;
@@ -764,101 +961,35 @@ async function extractMetadata(fileItem) {
   try {
     const file = await fileItem.handle.getFile();
     fileItem.metadata = { title: '', artist: '', album: '' };
+    const ext = file.name.split('.').pop().toLowerCase();
     
-    // Try to read ID3 tags from MP3 files
-    if (file.name.toLowerCase().endsWith('.mp3')) {
-      const buffer = await file.slice(0, 256 * 1024).arrayBuffer(); // Read first 256KB for more metadata
+    if (ext === 'mp3') {
+      const buffer = await file.slice(0, 256 * 1024).arrayBuffer();
       const view = new DataView(buffer);
+      parseID3IntoMetadata(view, fileItem.metadata);
+    } else if (ext === 'wav') {
+      // WAV metadata can be at the end of the file (after audio data)
+      // Read last 1MB to catch ID3 and LIST INFO chunks
+      const tailLen = Math.min(1024 * 1024, file.size);
+      const tail = await file.slice(file.size - tailLen, file.size).arrayBuffer();
       
-      // Check for ID3v2 header
-      if (view.getUint8(0) === 0x49 && view.getUint8(1) === 0x44 && view.getUint8(2) === 0x33) {
-        // ID3v2 found - parse it
-        const version = view.getUint8(3);
-        const size = ((view.getUint8(6) & 0x7f) << 21) |
-                     ((view.getUint8(7) & 0x7f) << 14) |
-                     ((view.getUint8(8) & 0x7f) << 7) |
-                     (view.getUint8(9) & 0x7f);
-        
-        let offset = 10;
-        const headerSize = Math.min(size + 10, buffer.byteLength);
-        
-        while (offset < headerSize - 10) {
-          // Read frame header
-          let frameId = '';
-          for (let i = 0; i < 4; i++) {
-            const char = view.getUint8(offset + i);
-            if (char === 0) break;
-            frameId += String.fromCharCode(char);
-          }
-          
-          if (!frameId || frameId[0] === '\0') break;
-          
-          let frameSize;
-          if (version === 4) {
-            frameSize = ((view.getUint8(offset + 4) & 0x7f) << 21) |
-                        ((view.getUint8(offset + 5) & 0x7f) << 14) |
-                        ((view.getUint8(offset + 6) & 0x7f) << 7) |
-                        (view.getUint8(offset + 7) & 0x7f);
-          } else {
-            frameSize = (view.getUint8(offset + 4) << 24) |
-                        (view.getUint8(offset + 5) << 16) |
-                        (view.getUint8(offset + 6) << 8) |
-                        view.getUint8(offset + 7);
-          }
-          
-          if (frameSize <= 0 || frameSize > headerSize) break;
-          
-          const frameStart = offset + 10;
-          const frameEnd = Math.min(frameStart + frameSize, buffer.byteLength);
-          
-          // Check if this is a frame we want to extract
-          const metadataField = ID3_FRAME_MAP[frameId];
-          if (metadataField) {
-            const encoding = view.getUint8(frameStart);
-            let text = '';
-            let dataStart = frameStart + 1;
-            
-            // For COMM (comments) frame, skip language code and description
-            if (frameId === 'COMM' || frameId === 'USLT') {
-              dataStart = frameStart + 4; // Skip encoding + 3-byte language
-              // Skip description (null-terminated)
-              while (dataStart < frameEnd && view.getUint8(dataStart) !== 0) {
-                dataStart++;
-              }
-              dataStart++; // Skip the null terminator
-            }
-            
-            if (encoding === 0 || encoding === 3) {
-              // ISO-8859-1 or UTF-8
-              for (let i = dataStart; i < frameEnd; i++) {
-                const char = view.getUint8(i);
-                if (char === 0) break;
-                text += String.fromCharCode(char);
-              }
-            } else if (encoding === 1 || encoding === 2) {
-              // UTF-16
-              let start = dataStart;
-              // Skip BOM if present
-              if (start < frameEnd - 1) {
-                const bom1 = view.getUint8(start);
-                const bom2 = view.getUint8(start + 1);
-                if ((bom1 === 0xFF && bom2 === 0xFE) || (bom1 === 0xFE && bom2 === 0xFF)) {
-                  start += 2;
-                }
-              }
-              for (let i = start; i < frameEnd - 1; i += 2) {
-                const code = view.getUint16(i, true);
-                if (code === 0) break;
-                text += String.fromCharCode(code);
-              }
-            }
-            
-            fileItem.metadata[metadataField] = text.trim();
-          }
-          
-          offset += 10 + frameSize;
-        }
+      console.log(`[WAV] Extracting metadata from ${file.name}, size=${file.size}, tailLen=${tailLen}`);
+      
+      // Scan for LIST INFO chunk
+      const foundListInfo = scanForListInfo(tail, fileItem.metadata);
+      console.log(`[WAV] LIST INFO found: ${foundListInfo}`);
+      
+      // Scan for ID3 chunk (either "id3 " RIFF chunk or raw ID3 header)
+      const foundID3 = scanForID3InWav(tail, fileItem.metadata);
+      console.log(`[WAV] ID3 found: ${foundID3}`);
+      
+      // Also check beginning of file for early LIST INFO (small files)
+      if (Object.values(fileItem.metadata).every(v => !v)) {
+        const head = await file.slice(0, 256 * 1024).arrayBuffer();
+        parseRiffListInfo(head, fileItem.metadata);
       }
+      
+      console.log(`[WAV] Final metadata:`, fileItem.metadata);
     }
   } catch (err) {
     console.log('Could not extract metadata:', err);
