@@ -1376,7 +1376,7 @@ function handleMetadataPanelResize(e) {
   const panel = elements.metadataPreviewPanel;
   // Moving up increases height, moving down decreases
   const diff = metadataResizeState.startY - e.clientY;
-  const newHeight = Math.max(60, Math.min(375, metadataResizeState.startHeight + diff));
+  const newHeight = Math.max(60, Math.min(500, metadataResizeState.startHeight + diff));
   
   panel.style.height = `${newHeight}px`;
 }
