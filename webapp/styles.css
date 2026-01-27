@@ -1209,6 +1209,9 @@ section h2 {
 }
 
 .file-item-col.file-col-duration {
+  width: 75px;
+  min-width: 55px;
+  flex-shrink: 0;
   font-size: 11px;
   color: rgba(0, 0, 0, 0.7);
   font-family: inherit;
