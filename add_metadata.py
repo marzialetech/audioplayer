@@ -42,7 +42,7 @@ metadata = [
         "key": "C",
         "comments": "Opening jingle, Upbeat, Energetic, Morning show, Radio intro",
         "isrc": "USRC12400001",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/02-station-id.mp3",
@@ -61,7 +61,7 @@ metadata = [
         "key": "G",
         "comments": "Legal ID, FCC compliance, Top of hour, Station branding",
         "isrc": "USRC12400002",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/03-weather.mp3",
@@ -80,7 +80,7 @@ metadata = [
         "key": "Am",
         "comments": "Weather bed, Forecast, Meteorology, Soft background, Informational",
         "isrc": "USRC12400003",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/04-news-intro.mp3",
@@ -99,7 +99,7 @@ metadata = [
         "key": "D",
         "comments": "Breaking news, Headlines, Urgent, Dramatic, News bulletin",
         "isrc": "USRC12400004",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/05-commercial-break.mp3",
@@ -118,7 +118,7 @@ metadata = [
         "key": "F",
         "comments": "Ad break, Sponsor transition, Commercial intro, Advertising",
         "isrc": "USRC12400005",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     
     # Subfolder files
@@ -139,7 +139,7 @@ metadata = [
         "key": "Bb",
         "comments": "Time announcement, Clock, Hour check, Quick hit, Punctual",
         "isrc": "USRC12500006",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/subfolder/07-traffic.mp3",
@@ -158,7 +158,7 @@ metadata = [
         "key": "E",
         "comments": "Commute update, Road conditions, Highway, Drive time, Rush hour",
         "isrc": "USRC12500007",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/subfolder/08-jinglereallylongnamereallylongnamereallylongname.mp3",
@@ -177,7 +177,7 @@ metadata = [
         "key": "Ab",
         "comments": "UI Testing, Long text overflow, Scrolling test, Truncation check, Display validation, Layout stress test",
         "isrc": "USRC12500008",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/subfolder/09-outro.mp3",
@@ -196,7 +196,7 @@ metadata = [
         "key": "C#m",
         "comments": "Show ending, Sign off, Goodbye, Closing theme, Fade out",
         "isrc": "USRC12500009",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
     {
         "file": "sample-audio/subfolder/10-test-tone.mp3",
@@ -215,7 +215,7 @@ metadata = [
         "key": "A440",
         "comments": "Calibration, EBU tone, Reference level, Audio test, 1kHz sine wave, -18dBFS",
         "isrc": "USRC12500010",
-        "encoder": "Rockstar Audio Suite v1.2"
+        "encoder": "Rockstar Audio Suite v1.3"
     },
 ]
 

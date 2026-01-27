@@ -1,6 +1,6 @@
 /**
- * rockstar v1.1 by Pixamation - Desktop Application
- * Main Renderer Process with Visualizers and Enhanced Features
+ * rockstar v1.3 by Pixamation - Desktop Application (Electron)
+ * Browser-based audio playback application
  */
 
 // Constants
@@ -20,18 +20,40 @@ let audioContext = null;
 // State Management
 const state = {
   directorySlots: {
-    1: { path: '', currentPath: '' },
-    2: { path: '', currentPath: '' },
-    3: { path: '', currentPath: '' },
-    4: { path: '', currentPath: '' }
+    1: { fullPath: null, name: '', path: '', files: [] },
+    2: { fullPath: null, name: '', path: '', files: [] },
+    3: { fullPath: null, name: '', path: '', files: [] },
+    4: { fullPath: null, name: '', path: '', files: [] }
   },
   activeDirectorySlot: 1,
+  currentPath: [], // Breadcrumb for navigation within directory
+  currentFiles: [], // Files in current view
   decks: {},
   selectedFile: null,
   masterVolume: 1,
-  searchResults: [],
   searchQuery: '',
-  draggingFile: null
+  draggingFile: null, // Store file being dragged (handles can't be serialized)
+  draggingDeckSlot: null, // Store deck/hot button slot being dragged for reordering
+  layout: '20x1', // '20x1' or '10x2'
+  clickToAssignMode: false, // True when a file is selected and waiting to be assigned
+  slotInput: '', // Stores typed number for quick slot assignment (1-20)
+  keyboardFocus: {
+    area: null, // 'files', 'decks', 'hotbuttons', or 'dirslots'
+    index: 0    // Index within the current area
+  },
+  focusFirstFileAfterNav: false, // Flag to focus first file after folder navigation
+  debugMode: false, // Debug mode to show keystrokes
+  keyboardEnabled: false, // Toggle for enabling/disabling keyboard shortcuts (default OFF)
+  sortColumn: 'name', // Current sort column: 'name', 'title', 'artist', 'album'
+  sortDirection: 'asc', // Sort direction: 'asc' or 'desc'
+  
+  // Metadata extraction queue system
+  metadataQueue: {
+    priority: new Set(),    // Indices of visible files (high priority)
+    pending: new Set(),     // All files needing extraction
+    processing: false,      // Is the queue processor running?
+    abortController: null   // To cancel ongoing extraction when folder changes
+  }
 };
 
 // Initialize decks 1-20
@@ -61,12 +83,23 @@ const elements = {
   dropOverlay: document.getElementById('dropOverlay'),
   statusMessage: document.getElementById('statusMessage'),
   statusTime: document.getElementById('statusTime'),
-  currentPathDisplay: document.getElementById('currentPathDisplay')
+  currentPathDisplay: document.getElementById('currentPathDisplay'),
+  btnLayoutToggle: document.getElementById('btnLayoutToggle'),
+  audioDecksPanel: document.querySelector('.audio-decks-panel'),
+  fileAssignMessage: document.getElementById('fileAssignMessage'),
+  debugOverlay: document.getElementById('debugOverlay'),
+  keyboardToggle: document.getElementById('keyboardToggle'),
+  fileListHeader: document.getElementById('fileListHeader'),
+  btnResetColumns: document.getElementById('btnResetColumns'),
+  metadataPreviewPanel: document.getElementById('metadataPreviewPanel'),
+  metadataPreviewFilename: document.getElementById('metadataPreviewFilename'),
+  metadataPreviewContent: document.getElementById('metadataPreviewContent'),
+  metadataResizeHandle: document.getElementById('metadataResizeHandle')
 };
 
 // Initialize Application
 async function init() {
-  console.log('Initializing rockstar v1.1...');
+  console.log('Initializing rockstar v1.3...');
   
   // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
@@ -75,11 +108,14 @@ async function init() {
     setupVisualizer(i);
   }
   
-  // Load saved settings
-  await loadSettings();
-  
   // Setup event listeners
   setupEventListeners();
+  
+  // Load saved audio decks panel width preference
+  const savedWidth = localStorage.getItem('audioDecksPanelWidth');
+  if (savedWidth) {
+    elements.audioDecksPanel.style.width = `${savedWidth}px`;
+  }
   
   // Start visualizer animation loop
   requestAnimationFrame(drawAllVisualizers);
@@ -88,7 +124,58 @@ async function init() {
   updateStatusTime();
   setInterval(updateStatusTime, 1000);
   
+  // Electron-specific: Load saved directory slots
+  await loadSavedDirectorySlots();
+  
+  // Listen for menu-triggered directory selection
+  if (window.electronAPI && window.electronAPI.onDirectorySelected) {
+    window.electronAPI.onDirectorySelected((data) => {
+      const slotNum = data.slot;
+      const folderPath = data.path;
+      const folderName = folderPath.split(/[/\\]/).pop();
+      
+      state.directorySlots[slotNum].path = folderPath;
+      state.directorySlots[slotNum].fullPath = folderPath;
+      state.directorySlots[slotNum].name = folderName;
+      
+      document.getElementById(`dirPath${slotNum}`).textContent = folderName;
+      switchToDirectorySlot(slotNum);
+    });
+  }
+  
   setStatus('Ready - Select a directory to browse audio files');
+}
+
+// Load saved directory slots from persistent storage (Electron)
+async function loadSavedDirectorySlots() {
+  if (!window.electronAPI) return;
+  
+  try {
+    const savedSlots = await window.electronAPI.getDirectorySlots();
+    
+    for (const [slotNum, folderPath] of Object.entries(savedSlots)) {
+      const slot = parseInt(slotNum);
+      if (folderPath && slot >= 1 && slot <= 4) {
+        const folderName = folderPath.split(/[/\\]/).pop();
+        
+        state.directorySlots[slot].path = folderPath;
+        state.directorySlots[slot].fullPath = folderPath;
+        state.directorySlots[slot].name = folderName;
+        
+        document.getElementById(`dirPath${slot}`).textContent = folderName;
+      }
+    }
+    
+    // Load first available slot
+    for (let i = 1; i <= 4; i++) {
+      if (state.directorySlots[i].fullPath) {
+        switchToDirectorySlot(i);
+        break;
+      }
+    }
+  } catch (err) {
+    console.error('Error loading saved directory slots:', err);
+  }
 }
 
 // Initialize Audio Context (must be done after user interaction)
@@ -186,41 +273,6 @@ function drawAllVisualizers() {
   requestAnimationFrame(drawAllVisualizers);
 }
 
-// Load saved settings
-async function loadSettings() {
-  try {
-    // Load directory slots
-    const savedSlots = await window.electronAPI.getDirectorySlots();
-    if (savedSlots) {
-      for (let i = 1; i <= DIR_SLOT_COUNT; i++) {
-        if (savedSlots[i]) {
-          state.directorySlots[i].path = savedSlots[i];
-          state.directorySlots[i].currentPath = savedSlots[i];
-          const folderName = savedSlots[i].split('/').pop() || savedSlots[i];
-          document.getElementById(`dirPath${i}`).textContent = folderName;
-        }
-      }
-      // Load first slot if it has content
-      if (savedSlots[1]) {
-        switchToDirectorySlot(1);
-      }
-    }
-    
-    // Load hot buttons (which are synced with decks)
-    const hotButtons = await window.electronAPI.loadHotButtons();
-    if (hotButtons) {
-      for (const [slot, data] of Object.entries(hotButtons)) {
-        const deckNum = parseInt(slot);
-        if (data && data.path) {
-          loadToDeck(deckNum, data.path, data.name);
-        }
-      }
-    }
-  } catch (error) {
-    console.error('Error loading settings:', error);
-  }
-}
-
 // Setup audio deck
 function setupDeckAudio(deckNum) {
   const audio = state.decks[deckNum].audio;
@@ -259,6 +311,32 @@ function setupEventListeners() {
     updateAllDeckVolumes();
   });
   
+  // Keyboard toggle
+  if (elements.keyboardToggle) {
+    elements.keyboardToggle.addEventListener('change', (e) => {
+      state.keyboardEnabled = e.target.checked;
+      // Clear any keyboard focus when disabling
+      if (!state.keyboardEnabled) {
+        clearKeyboardFocus();
+        // Hide debug overlay if it was showing
+        if (elements.debugOverlay) {
+          elements.debugOverlay.classList.remove('visible');
+        }
+        state.debugMode = false;
+      }
+      setStatus(state.keyboardEnabled ? 'Keyboard shortcuts enabled' : 'Keyboard shortcuts disabled');
+    });
+  }
+  
+  // Layout toggle
+  elements.btnLayoutToggle.addEventListener('click', toggleLayout);
+  
+  // Resize handle for audio decks panel
+  setupResizeHandle();
+  
+  // Column resize handle for 10x2 layout
+  setupColumnResizeHandle();
+  
   // Directory slot buttons
   document.querySelectorAll('.btn-select-dir').forEach(btn => {
     btn.addEventListener('click', () => selectDirectory(parseInt(btn.dataset.slot)));
@@ -270,9 +348,7 @@ function setupEventListeners() {
       // Don't switch if clicking the button itself
       if (e.target.classList.contains('btn-select-dir')) return;
       const slotNum = parseInt(slot.dataset.slot);
-      if (state.directorySlots[slotNum].path) {
-        switchToDirectorySlot(slotNum);
-      }
+      switchToDirectorySlot(slotNum);
     });
   });
   
@@ -284,10 +360,7 @@ function setupEventListeners() {
   elements.searchInput.addEventListener('input', (e) => {
     if (e.target.value === '') {
       state.searchQuery = '';
-      const slot = state.directorySlots[state.activeDirectorySlot];
-      if (slot.currentPath) {
-        loadFolderContents(slot.currentPath);
-      }
+      renderFileList();
     }
   });
   
@@ -334,10 +407,19 @@ function setupEventListeners() {
     });
   });
   
-  // Hot buttons - click to play, right-click to clear
+  // Hot buttons - click to play/assign, right-click to clear
   document.querySelectorAll('.hot-button').forEach(btn => {
     btn.addEventListener('click', () => {
       const slot = parseInt(btn.dataset.slot);
+      
+      // If in click-to-assign mode, load the selected file
+      if (state.clickToAssignMode && state.selectedFile) {
+        loadToDeck(slot, state.selectedFile);
+        exitClickToAssignMode();
+        return;
+      }
+      
+      // Otherwise, play if has file
       if (state.decks[slot].file) {
         playDeck(slot);
       }
@@ -346,6 +428,26 @@ function setupEventListeners() {
     btn.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       clearDeck(btn.dataset.slot);
+    });
+    
+    // Make hot buttons draggable for reordering
+    btn.draggable = true;
+    
+    btn.addEventListener('dragstart', (e) => {
+      const slot = parseInt(btn.dataset.slot);
+      // Only allow dragging if the slot has a file
+      if (state.decks[slot].file) {
+        state.draggingDeckSlot = slot;
+        e.dataTransfer.effectAllowed = 'move';
+        btn.classList.add('dragging');
+      } else {
+        e.preventDefault();
+      }
+    });
+    
+    btn.addEventListener('dragend', () => {
+      btn.classList.remove('dragging');
+      state.draggingDeckSlot = null;
     });
     
     // Drag and drop for hot buttons
@@ -361,16 +463,65 @@ function setupEventListeners() {
     btn.addEventListener('drop', (e) => {
       e.preventDefault();
       btn.classList.remove('drag-over');
-      const filePath = e.dataTransfer.getData('text/plain');
-      const fileName = e.dataTransfer.getData('text/filename');
-      if (filePath) {
-        loadToDeck(btn.dataset.slot, filePath, fileName);
+      const targetSlot = parseInt(btn.dataset.slot);
+      
+      // Check if we're swapping decks
+      if (state.draggingDeckSlot !== null) {
+        swapDecks(state.draggingDeckSlot, targetSlot);
+        state.draggingDeckSlot = null;
+      }
+      // Otherwise load a file from file browser
+      else if (state.draggingFile) {
+        loadToDeck(targetSlot, state.draggingFile);
       }
     });
   });
   
-  // Audio decks drag and drop
+  // Hot button queue buttons
+  document.querySelectorAll('.btn-hot-queue').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Don't trigger hot button click
+      const slot = parseInt(btn.dataset.slot);
+      toggleQueue(slot);
+    });
+  });
+  
+  // Audio decks - click to assign, drag and drop
   document.querySelectorAll('.audio-deck').forEach(deck => {
+    // Click on deck to assign selected file
+    deck.addEventListener('click', (e) => {
+      // Don't trigger if clicking on buttons or sliders
+      if (e.target.matches('button, input')) return;
+      
+      const deckNum = parseInt(deck.dataset.deck);
+      
+      // If in click-to-assign mode, load the selected file
+      if (state.clickToAssignMode && state.selectedFile) {
+        loadToDeck(deckNum, state.selectedFile);
+        exitClickToAssignMode();
+      }
+    });
+    
+    // Make audio decks draggable for reordering
+    deck.draggable = true;
+    
+    deck.addEventListener('dragstart', (e) => {
+      const deckNum = parseInt(deck.dataset.deck);
+      // Only allow dragging if the deck has a file
+      if (state.decks[deckNum].file) {
+        state.draggingDeckSlot = deckNum;
+        e.dataTransfer.effectAllowed = 'move';
+        deck.classList.add('dragging');
+      } else {
+        e.preventDefault();
+      }
+    });
+    
+    deck.addEventListener('dragend', () => {
+      deck.classList.remove('dragging');
+      state.draggingDeckSlot = null;
+    });
+    
     deck.addEventListener('dragover', (e) => {
       e.preventDefault();
       deck.classList.add('drag-over');
@@ -383,53 +534,113 @@ function setupEventListeners() {
     deck.addEventListener('drop', (e) => {
       e.preventDefault();
       deck.classList.remove('drag-over');
-      const filePath = e.dataTransfer.getData('text/plain');
-      const fileName = e.dataTransfer.getData('text/filename');
-      if (filePath) {
-        loadToDeck(deck.dataset.deck, filePath, fileName);
+      const targetSlot = parseInt(deck.dataset.deck);
+      
+      // Check if we're swapping decks
+      if (state.draggingDeckSlot !== null) {
+        swapDecks(state.draggingDeckSlot, targetSlot);
+        state.draggingDeckSlot = null;
+      }
+      // Otherwise load a file from file browser
+      else if (state.draggingFile) {
+        loadToDeck(targetSlot, state.draggingFile);
       }
     });
   });
   
-  // Context menu
-  document.addEventListener('click', () => {
+  // Context menu and click-to-assign cancellation
+  document.addEventListener('click', (e) => {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+    
+    // Cancel click-to-assign mode if clicking outside file list, decks, or hot buttons
+    if (state.clickToAssignMode) {
+      const clickedOnDeck = e.target.closest('.audio-deck');
+      const clickedOnHotButton = e.target.closest('.hot-button');
+      const clickedOnFileItem = e.target.closest('.file-item');
+      
+      // Only cancel if not clicking on a valid target
+      if (!clickedOnDeck && !clickedOnHotButton && !clickedOnFileItem) {
+        exitClickToAssignMode();
+        setStatus('Click-to-assign cancelled');
+      }
+    }
   });
+  
+  // File list column sorting
+  if (elements.fileListHeader) {
+    elements.fileListHeader.querySelectorAll('.sortable').forEach(col => {
+      col.addEventListener('click', (e) => {
+        // Don't sort if clicking on resize handle
+        if (e.target.classList.contains('col-resize-handle')) return;
+        
+        const sortKey = col.dataset.sort;
+        if (state.sortColumn === sortKey) {
+          // Toggle direction
+          state.sortDirection = state.sortDirection === 'asc' ? 'desc' : 'asc';
+        } else {
+          state.sortColumn = sortKey;
+          state.sortDirection = 'asc';
+        }
+        updateSortIndicators();
+        renderFileList();
+      });
+    });
+    
+    // Setup column resizing
+    setupColumnResizing();
+  }
+  
+  // Reset column widths button
+  if (elements.btnResetColumns) {
+    elements.btnResetColumns.addEventListener('click', resetColumnWidths);
+  }
+  
+  // Metadata panel resize handle
+  if (elements.metadataResizeHandle && elements.metadataPreviewPanel) {
+    setupMetadataPanelResize();
+  }
   
   // Keyboard shortcuts
   document.addEventListener('keydown', handleKeyboard);
 }
 
-// Select directory for a slot
+// Select directory for a slot (Electron version)
 async function selectDirectory(slotNum) {
-  const path = await window.electronAPI.selectFolder();
-  if (path) {
-    state.directorySlots[slotNum].path = path;
-    state.directorySlots[slotNum].currentPath = path;
+  try {
+    const folderPath = await window.electronAPI.selectFolder();
     
-    const folderName = path.split('/').pop() || path;
+    if (!folderPath) {
+      return; // User cancelled
+    }
+    
+    // Extract folder name from path
+    const folderName = folderPath.split(/[/\\]/).pop();
+    
+    state.directorySlots[slotNum].path = folderPath;
+    state.directorySlots[slotNum].fullPath = folderPath;
+    state.directorySlots[slotNum].name = folderName;
+    
+    // Update UI
     document.getElementById(`dirPath${slotNum}`).textContent = folderName;
     
-    // Save to settings
-    await window.electronAPI.saveDirectorySlots(getDirectorySlotsForSave());
+    // Save to persistent storage
+    const slots = {};
+    for (let i = 1; i <= 4; i++) {
+      if (state.directorySlots[i].fullPath) {
+        slots[i] = state.directorySlots[i].fullPath;
+      }
+    }
+    await window.electronAPI.saveDirectorySlots(slots);
     
-    // Switch to this slot
+    // Switch to this slot and load contents
     switchToDirectorySlot(slotNum);
     
     setStatus(`Directory ${slotNum} set: ${folderName}`);
+  } catch (err) {
+    console.error('Error selecting directory:', err);
+    setStatus('Error selecting directory');
   }
-}
-
-// Get directory slots for saving
-function getDirectorySlotsForSave() {
-  const slots = {};
-  for (let i = 1; i <= DIR_SLOT_COUNT; i++) {
-    if (state.directorySlots[i].path) {
-      slots[i] = state.directorySlots[i].path;
-    }
-  }
-  return slots;
 }
 
 // Switch to a directory slot
@@ -446,104 +657,1219 @@ function switchToDirectorySlot(slotNum) {
   panel.classList.add(`slot-${slotNum}-active`);
   
   state.activeDirectorySlot = slotNum;
+  state.currentPath = [];
   
   const slot = state.directorySlots[slotNum];
-  if (slot.path) {
-    loadFolderContents(slot.currentPath || slot.path);
+  if (slot.fullPath) {
+    // Set flag to focus first file after loading
+    state.focusFirstFileAfterNav = true;
+    loadDirectoryContents(slot.fullPath);
+    elements.currentPathDisplay.textContent = slot.name || slot.fullPath;
   } else {
     elements.fileList.innerHTML = '<p class="file-list-empty">Click the button to select a directory.</p>';
     elements.currentPathDisplay.textContent = 'No directory selected';
   }
 }
 
-// Load folder contents
-async function loadFolderContents(folderPath) {
-  setStatus('Loading folder...');
-  
-  const slot = state.directorySlots[state.activeDirectorySlot];
-  slot.currentPath = folderPath;
-  
-  const contents = await window.electronAPI.getFolderContents(folderPath);
-  
-  if (contents.error) {
-    elements.fileList.innerHTML = `<p class="file-list-empty">Error: ${contents.error}</p>`;
-    setStatus('Error loading folder');
-    return;
+// Load directory contents (Electron version)
+async function loadDirectoryContents(basePath, subPath = []) {
+  try {
+    setStatus('Loading directory...');
+    
+    // Clear metadata preview when changing directories
+    clearMetadataPreview();
+    
+    // Build full path
+    const fullPath = subPath.length > 0 
+      ? basePath + '/' + subPath.join('/') 
+      : basePath;
+    
+    // Get folder contents via Electron API
+    const result = await window.electronAPI.getFolderContents(fullPath);
+    
+    if (result.error) {
+      console.error('Error loading directory:', result.error);
+      setStatus('Error loading directory');
+      return;
+    }
+    
+    // Transform to our format
+    const folders = result.folders.map(f => ({
+      name: f.name,
+      type: 'folder',
+      path: f.path
+    }));
+    
+    const files = result.files.map(f => ({
+      name: f.name,
+      type: 'file',
+      path: f.path,
+      size: f.size
+    }));
+    
+    state.currentFiles = [...folders, ...files];
+    state.currentPath = subPath;
+    state.currentBasePath = basePath;
+    
+    // Update path display
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    const displayPath = [slot.name || basePath, ...subPath].join(' / ');
+    elements.currentPathDisplay.textContent = displayPath;
+    
+    renderFileList();
+    setStatus(`Loaded ${files.length} audio files, ${folders.length} folders`);
+    
+    // Reset column widths to defaults when loading a new folder
+    resetColumnWidths();
+    
+    // Extract metadata in background
+    extractAllMetadata();
+  } catch (err) {
+    console.error('Error loading directory:', err);
+    setStatus('Error loading directory');
   }
-  
-  // Update path display
-  elements.currentPathDisplay.textContent = folderPath;
-  
-  renderFileList(contents, folderPath);
-  setStatus(`Loaded ${contents.files.length} audio files, ${contents.folders.length} folders`);
 }
 
-// Render file list
-function renderFileList(contents, currentPath) {
+// Update sort indicators in the column headers
+function updateSortIndicators() {
+  if (!elements.fileListHeader) return;
+  
+  elements.fileListHeader.querySelectorAll('.sortable').forEach(col => {
+    const sortKey = col.dataset.sort;
+    const indicator = col.querySelector('.sort-indicator');
+    
+    if (sortKey === state.sortColumn) {
+      col.classList.add('active');
+      indicator.textContent = state.sortDirection === 'asc' ? '▲' : '▼';
+    } else {
+      col.classList.remove('active');
+      indicator.textContent = '';
+    }
+  });
+}
+
+// Sort items based on current sort column and direction
+function sortItems(items) {
+  const sorted = [...items];
+  const col = state.sortColumn;
+  const dir = state.sortDirection === 'asc' ? 1 : -1;
+  
+  sorted.sort((a, b) => {
+    // Folders always come first
+    if (a.type === 'folder' && b.type !== 'folder') return -1;
+    if (a.type !== 'folder' && b.type === 'folder') return 1;
+    
+    let valA, valB;
+    
+    if (col === 'name') {
+      valA = a.name.toLowerCase();
+      valB = b.name.toLowerCase();
+    } else if (col === 'duration') {
+      // Duration is numeric
+      valA = (a.metadata && a.metadata.duration) ? a.metadata.duration : 0;
+      valB = (b.metadata && b.metadata.duration) ? b.metadata.duration : 0;
+      return (valA - valB) * dir;
+    } else {
+      // For metadata columns (strings)
+      valA = (a.metadata && a.metadata[col]) ? a.metadata[col].toLowerCase() : '';
+      valB = (b.metadata && b.metadata[col]) ? b.metadata[col].toLowerCase() : '';
+    }
+    
+    if (valA < valB) return -1 * dir;
+    if (valA > valB) return 1 * dir;
+    return 0;
+  });
+  
+  return sorted;
+}
+
+// Extract metadata from an audio file
+// ID3 frame ID to metadata field mapping
+const ID3_FRAME_MAP = {
+  'TIT2': 'title',
+  'TPE1': 'artist',
+  'TALB': 'album',
+  'TIT1': 'grouping',
+  'TCON': 'genre',
+  'TRCK': 'track',
+  'TYER': 'year',
+  'TDRC': 'date',        // Recording date (ID3v2.4)
+  'TDAT': 'date',        // Date (ID3v2.3)
+  'COMM': 'comments',
+  'TCOM': 'composer',
+  'TCOP': 'copyright',
+  'TPUB': 'publisher',
+  'TBPM': 'bpm',
+  'TKEY': 'key',
+  'TLEN': 'length',
+  'TENC': 'encoder',
+  'TPE2': 'albumArtist',
+  'TPE3': 'conductor',
+  'TPOS': 'discNumber',
+  'TSRC': 'isrc',
+  'USLT': 'lyrics',
+  'WXXX': 'url',
+  'TORY': 'originalYear',
+  'TOAL': 'originalAlbum',
+  'TOWN': 'fileOwner',
+  'TOPE': 'originalArtist',
+  'TEXT': 'lyricist',
+  'TSSE': 'encoderSettings'
+};
+
+// RIFF LIST-INFO chunk id to metadata field mapping (WAV native metadata)
+const RIFF_INFO_MAP = {
+  'INAM': 'title',
+  'IART': 'artist',
+  'IPRD': 'album',
+  'ICRD': 'date',
+  'ICMT': 'comments',
+  'IGNR': 'genre',
+  'ICOP': 'copyright',
+  'ISFT': 'encoder',
+  'ITRK': 'track',
+  'ISBJ': 'subject'
+};
+
+// Human-readable labels for metadata fields
+const METADATA_LABELS = {
+  title: 'Title',
+  artist: 'Artist',
+  album: 'Album',
+  duration: 'Duration',
+  grouping: 'Grouping',
+  genre: 'Genre',
+  track: 'Track',
+  year: 'Year',
+  date: 'Date',
+  comments: 'Comments',
+  composer: 'Composer',
+  copyright: 'Copyright',
+  publisher: 'Publisher',
+  bpm: 'BPM',
+  key: 'Key',
+  length: 'Length',
+  encoder: 'Encoder',
+  albumArtist: 'Album Artist',
+  conductor: 'Conductor',
+  discNumber: 'Disc',
+  isrc: 'ISRC',
+  lyrics: 'Lyrics',
+  url: 'URL',
+  subject: 'Subject',
+  originalYear: 'Original Year',
+  originalAlbum: 'Original Album',
+  fileOwner: 'File Owner',
+  originalArtist: 'Original Artist',
+  lyricist: 'Lyricist',
+  encoderSettings: 'Encoder Settings'
+};
+
+// Parse ID3v2 tags from a DataView (view must start at the "ID3" header). Mutates metadataObj.
+function parseID3IntoMetadata(view, metadataObj) {
+  if (view.byteLength < 10) return;
+  if (view.getUint8(0) !== 0x49 || view.getUint8(1) !== 0x44 || view.getUint8(2) !== 0x33) return;
+  const version = view.getUint8(3);
+  const size = ((view.getUint8(6) & 0x7f) << 21) |
+               ((view.getUint8(7) & 0x7f) << 14) |
+               ((view.getUint8(8) & 0x7f) << 7) |
+               (view.getUint8(9) & 0x7f);
+  let offset = 10;
+  const headerSize = Math.min(size + 10, view.byteLength);
+  while (offset < headerSize - 10) {
+    let frameId = '';
+    for (let i = 0; i < 4; i++) {
+      const c = view.getUint8(offset + i);
+      if (c === 0) break;
+      frameId += String.fromCharCode(c);
+    }
+    if (!frameId || frameId[0] === '\0') break;
+    let frameSize;
+    if (version === 4) {
+      frameSize = ((view.getUint8(offset + 4) & 0x7f) << 21) |
+                  ((view.getUint8(offset + 5) & 0x7f) << 14) |
+                  ((view.getUint8(offset + 6) & 0x7f) << 7) |
+                  (view.getUint8(offset + 7) & 0x7f);
+    } else {
+      frameSize = (view.getUint8(offset + 4) << 24) |
+                  (view.getUint8(offset + 5) << 16) |
+                  (view.getUint8(offset + 6) << 8) |
+                  view.getUint8(offset + 7);
+    }
+    if (frameSize <= 0 || frameSize > headerSize) break;
+    const frameStart = offset + 10;
+    const frameEnd = Math.min(frameStart + frameSize, view.byteLength);
+    const metadataField = ID3_FRAME_MAP[frameId];
+    if (metadataField) {
+      const encoding = view.getUint8(frameStart);
+      let text = '';
+      let dataStart = frameStart + 1;
+      if (frameId === 'COMM' || frameId === 'USLT') {
+        dataStart = frameStart + 4;
+        while (dataStart < frameEnd && view.getUint8(dataStart) !== 0) dataStart++;
+        dataStart++;
+      }
+      if (encoding === 0 || encoding === 3) {
+        for (let i = dataStart; i < frameEnd; i++) {
+          const char = view.getUint8(i);
+          if (char === 0) break;
+          text += String.fromCharCode(char);
+        }
+      } else if (encoding === 1 || encoding === 2) {
+        let start = dataStart;
+        if (start < frameEnd - 1 && ((view.getUint8(start) === 0xFF && view.getUint8(start + 1) === 0xFE) ||
+            (view.getUint8(start) === 0xFE && view.getUint8(start + 1) === 0xFF))) start += 2;
+        for (let i = start; i < frameEnd - 1; i += 2) {
+          const code = view.getUint16(i, true);
+          if (code === 0) break;
+          text += String.fromCharCode(code);
+        }
+      }
+      const trimmed = text.trim();
+      if (trimmed) metadataObj[metadataField] = trimmed;
+    }
+    offset += 10 + frameSize;
+  }
+}
+
+// Parse RIFF LIST-INFO chunk from WAV buffer (first 256KB). Mutates metadataObj.
+function parseRiffListInfo(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  if (view.byteLength < 12) return;
+  if (String.fromCharCode(view.getUint8(0), view.getUint8(1), view.getUint8(2), view.getUint8(3)) !== 'RIFF') return;
+  let pos = 12;
+  while (pos < view.byteLength - 8) {
+    const chunkId = String.fromCharCode(view.getUint8(pos), view.getUint8(pos + 1), view.getUint8(pos + 2), view.getUint8(pos + 3));
+    const chunkSize = view.getUint32(pos + 4, true);
+    pos += 8;
+    if (chunkId === 'LIST' && chunkSize >= 4) {
+      const listType = String.fromCharCode(view.getUint8(pos), view.getUint8(pos + 1), view.getUint8(pos + 2), view.getUint8(pos + 3));
+      if (listType === 'INFO') {
+        let sub = pos + 4;
+        const listEnd = pos + chunkSize;
+        while (sub < listEnd - 8) {
+          const subId = String.fromCharCode(view.getUint8(sub), view.getUint8(sub + 1), view.getUint8(sub + 2), view.getUint8(sub + 3));
+          const subSize = view.getUint32(sub + 4, true);
+          sub += 8;
+          const field = RIFF_INFO_MAP[subId];
+          if (field && subSize > 0 && sub + subSize <= view.byteLength) {
+            let s = '';
+            for (let i = 0; i < subSize; i++) {
+              const b = view.getUint8(sub + i);
+              if (b === 0) break;
+              s += String.fromCharCode(b);
+            }
+            const trimmed = s.trim();
+            if (trimmed) metadataObj[field] = trimmed;
+          }
+          sub += (subSize + 1) & ~1;
+        }
+        return;
+      }
+    }
+    pos += (chunkSize + 1) & ~1;
+  }
+}
+
+// Scan buffer for LIST INFO chunk anywhere in the data (for WAV tail reads)
+function scanForListInfo(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  for (let i = 0; i <= view.byteLength - 12; i++) {
+    // Look for "LIST" followed by size and "INFO"
+    if (view.getUint8(i) === 0x4C && view.getUint8(i + 1) === 0x49 &&
+        view.getUint8(i + 2) === 0x53 && view.getUint8(i + 3) === 0x54) {
+      const chunkSize = view.getUint32(i + 4, true);
+      if (i + 8 + 4 <= view.byteLength &&
+          view.getUint8(i + 8) === 0x49 && view.getUint8(i + 9) === 0x4E &&
+          view.getUint8(i + 10) === 0x46 && view.getUint8(i + 11) === 0x4F) {
+        // Found LIST INFO
+        let sub = i + 12;
+        const listEnd = Math.min(i + 8 + chunkSize, view.byteLength);
+        while (sub < listEnd - 8) {
+          const subId = String.fromCharCode(view.getUint8(sub), view.getUint8(sub + 1),
+                                            view.getUint8(sub + 2), view.getUint8(sub + 3));
+          const subSize = view.getUint32(sub + 4, true);
+          sub += 8;
+          const field = RIFF_INFO_MAP[subId];
+          if (field && subSize > 0 && sub + subSize <= view.byteLength) {
+            let s = '';
+            for (let j = 0; j < subSize; j++) {
+              const b = view.getUint8(sub + j);
+              if (b === 0) break;
+              s += String.fromCharCode(b);
+            }
+            const trimmed = s.trim();
+            if (trimmed) metadataObj[field] = trimmed;
+          }
+          sub += (subSize + 1) & ~1;
+        }
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+// Scan buffer for "ID3 " or "id3 " RIFF chunk (Soundminer style) or raw ID3 header
+function scanForID3InWav(buffer, metadataObj) {
+  const view = new DataView(buffer);
+  for (let i = 0; i <= view.byteLength - 10; i++) {
+    const b0 = view.getUint8(i), b1 = view.getUint8(i + 1), b2 = view.getUint8(i + 2), b3 = view.getUint8(i + 3);
+    // Check for "ID3 " or "id3 " RIFF chunk (uppercase 0x49 0x44 0x33 0x20 or lowercase 0x69 0x64 0x33 0x20)
+    if (((b0 === 0x49 && b1 === 0x44) || (b0 === 0x69 && b1 === 0x64)) && b2 === 0x33 && b3 === 0x20) {
+      const chunkSize = view.getUint32(i + 4, true);
+      if (i + 8 < view.byteLength && chunkSize > 10) {
+        // ID3v2 data starts after the chunk header
+        parseID3IntoMetadata(new DataView(buffer, i + 8), metadataObj);
+        return true;
+      }
+    }
+    // Check for raw ID3v2 header (0x49 0x44 0x33 = "ID3")
+    if (b0 === 0x49 && b1 === 0x44 && b2 === 0x33 && b3 !== 0x20) {
+      parseID3IntoMetadata(new DataView(buffer, i), metadataObj);
+      return true;
+    }
+  }
+  return false;
+}
+
+// Format duration in seconds to MM:SS or HH:MM:SS
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return '';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Get audio duration using a temporary audio element (Electron version - uses file path)
+function getAudioDuration(filePath) {
+  return new Promise((resolve) => {
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    // Use file:// protocol for local files
+    audio.src = 'file://' + filePath;
+    audio.onloadedmetadata = () => {
+      resolve(audio.duration);
+    };
+    audio.onerror = () => {
+      resolve(null);
+    };
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      resolve(null);
+    }, 5000);
+  });
+}
+
+async function extractMetadata(fileItem) {
+  if (!fileItem.path || fileItem.type !== 'file') return;
+  if (fileItem.metadata) return; // Already extracted
+  
+  try {
+    fileItem.metadata = { title: '', artist: '', album: '' };
+    const ext = fileItem.name.split('.').pop().toLowerCase();
+    
+    // Get audio duration using file path
+    const duration = await getAudioDuration(fileItem.path);
+    if (duration) {
+      fileItem.metadata.duration = duration;
+    }
+    
+    // Get file size for reading slices
+    const fileSize = fileItem.size || await window.electronAPI.getFileSize(fileItem.path);
+    
+    if (ext === 'mp3') {
+      // Read first 256KB for ID3 tags
+      const headData = await window.electronAPI.readFileSlice(fileItem.path, 0, 256 * 1024);
+      if (headData) {
+        const buffer = new Uint8Array(headData).buffer;
+        const view = new DataView(buffer);
+        parseID3IntoMetadata(view, fileItem.metadata);
+      }
+    } else if (ext === 'wav') {
+      // WAV metadata can be at the end of the file (after audio data)
+      // Read last 1MB to catch ID3 and LIST INFO chunks
+      const tailLen = Math.min(1024 * 1024, fileSize);
+      const tailData = await window.electronAPI.readFileSlice(fileItem.path, -tailLen, tailLen);
+      
+      if (tailData) {
+        const tail = new Uint8Array(tailData).buffer;
+        
+        console.log(`[WAV] Extracting metadata from ${fileItem.name}, size=${fileSize}, tailLen=${tailLen}`);
+        
+        // Scan for LIST INFO chunk
+        const foundListInfo = scanForListInfo(tail, fileItem.metadata);
+        console.log(`[WAV] LIST INFO found: ${foundListInfo}`);
+        
+        // Scan for ID3 chunk (either "id3 " RIFF chunk or raw ID3 header)
+        const foundID3 = scanForID3InWav(tail, fileItem.metadata);
+        console.log(`[WAV] ID3 found: ${foundID3}`);
+        
+        // Also check beginning of file for early LIST INFO (small files)
+        if (Object.values(fileItem.metadata).every(v => !v || v === fileItem.metadata.duration)) {
+          const headData = await window.electronAPI.readFileSlice(fileItem.path, 0, 256 * 1024);
+          if (headData) {
+            const head = new Uint8Array(headData).buffer;
+            parseRiffListInfo(head, fileItem.metadata);
+          }
+        }
+        
+        console.log(`[WAV] Final metadata:`, fileItem.metadata);
+      }
+    }
+  } catch (err) {
+    console.log('Could not extract metadata:', err);
+    fileItem.metadata = { title: '', artist: '', album: '' };
+  }
+}
+
+// Metadata extraction queue configuration
+const METADATA_CONFIG = {
+  BATCH_SIZE: 4,           // Process 4 files concurrently
+  BATCH_DELAY_MS: 50,      // 50ms pause between batches (keeps CPU cool)
+  PRIORITY_CHECK_MS: 100   // Check for priority items every 100ms
+};
+
+// Initialize metadata extraction queue for current files
+function initMetadataQueue() {
+  // Cancel any ongoing extraction
+  if (state.metadataQueue.abortController) {
+    state.metadataQueue.abortController.abort();
+  }
+  
+  // Reset queue
+  state.metadataQueue.priority.clear();
+  state.metadataQueue.pending.clear();
+  state.metadataQueue.processing = false;
+  state.metadataQueue.abortController = new AbortController();
+  
+  // Add all audio files to pending queue
+  state.currentFiles.forEach((file, index) => {
+    if (file.type === 'file' && !file.metadata) {
+      state.metadataQueue.pending.add(index);
+    }
+  });
+  
+  // Setup intersection observer for visible files
+  setupMetadataObserver();
+  
+  // Start processing
+  processMetadataQueue();
+}
+
+// Intersection Observer to detect visible file items
+let metadataObserver = null;
+
+function setupMetadataObserver() {
+  // Disconnect existing observer
+  if (metadataObserver) {
+    metadataObserver.disconnect();
+  }
+  
+  // Create new observer
+  metadataObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const index = parseInt(entry.target.dataset.fileIndex);
+      if (isNaN(index)) return;
+      
+      if (entry.isIntersecting) {
+        // File is visible - add to priority queue if still pending
+        if (state.metadataQueue.pending.has(index)) {
+          state.metadataQueue.priority.add(index);
+        }
+      } else {
+        // File scrolled out of view - remove from priority
+        state.metadataQueue.priority.delete(index);
+      }
+    });
+  }, {
+    root: elements.fileList,
+    rootMargin: '100px 0px', // Pre-load items 100px before they're visible
+    threshold: 0
+  });
+  
+  // Observe all file items
+  document.querySelectorAll('.file-item[data-file-index]').forEach(el => {
+    metadataObserver.observe(el);
+  });
+}
+
+// Process the metadata queue with priority for visible files
+async function processMetadataQueue() {
+  if (state.metadataQueue.processing) return;
+  state.metadataQueue.processing = true;
+  
+  const abortSignal = state.metadataQueue.abortController?.signal;
+  
+  while (state.metadataQueue.pending.size > 0) {
+    // Check if aborted (folder changed)
+    if (abortSignal?.aborted) {
+      state.metadataQueue.processing = false;
+      return;
+    }
+    
+    // Get next batch - prioritize visible files
+    const batch = [];
+    
+    // First, take from priority queue (visible files)
+    for (const index of state.metadataQueue.priority) {
+      if (batch.length >= METADATA_CONFIG.BATCH_SIZE) break;
+      if (state.metadataQueue.pending.has(index)) {
+        batch.push(index);
+      }
+    }
+    
+    // Fill remaining slots from pending queue
+    if (batch.length < METADATA_CONFIG.BATCH_SIZE) {
+      for (const index of state.metadataQueue.pending) {
+        if (batch.length >= METADATA_CONFIG.BATCH_SIZE) break;
+        if (!batch.includes(index)) {
+          batch.push(index);
+        }
+      }
+    }
+    
+    if (batch.length === 0) break;
+    
+    // Remove from queues
+    batch.forEach(index => {
+      state.metadataQueue.pending.delete(index);
+      state.metadataQueue.priority.delete(index);
+    });
+    
+    // Process batch concurrently
+    await Promise.all(batch.map(async (index) => {
+      const file = state.currentFiles[index];
+      if (file && !file.metadata) {
+        await extractMetadata(file);
+        // Update just this row in the DOM
+        updateFileRow(index, file);
+      }
+    }));
+    
+    // Small delay between batches to keep CPU responsive
+    await new Promise(resolve => setTimeout(resolve, METADATA_CONFIG.BATCH_DELAY_MS));
+  }
+  
+  state.metadataQueue.processing = false;
+}
+
+// Update a single file row in the DOM without full re-render
+function updateFileRow(index, file) {
+  const row = document.querySelector(`.file-item[data-file-index="${index}"]`);
+  if (!row || !file.metadata) return;
+  
+  const duration = file.metadata.duration ? formatDuration(file.metadata.duration) : '';
+  const title = file.metadata.title || '';
+  const artist = file.metadata.artist || '';
+  const album = file.metadata.album || '';
+  
+  // Update individual cells
+  const durationCell = row.querySelector('.file-col-duration');
+  const titleCell = row.querySelector('.file-col-title');
+  const artistCell = row.querySelector('.file-col-artist');
+  const albumCell = row.querySelector('.file-col-album');
+  
+  if (durationCell) durationCell.textContent = duration;
+  if (titleCell) {
+    titleCell.textContent = title;
+    titleCell.title = title;
+  }
+  if (artistCell) {
+    artistCell.textContent = artist;
+    artistCell.title = artist;
+  }
+  if (albumCell) {
+    albumCell.textContent = album;
+    albumCell.title = album;
+  }
+}
+
+// Legacy function for compatibility - now just starts the queue
+async function extractAllMetadata() {
+  initMetadataQueue();
+}
+
+function renderFileList() {
   elements.fileList.innerHTML = '';
   
-  const slot = state.directorySlots[state.activeDirectorySlot];
+  // Add original index to each item for tracking
+  let items = state.currentFiles.map((f, idx) => ({ ...f, _originalIndex: idx }));
   
-  // Add parent folder if not at root
-  if (currentPath !== slot.path) {
+  // Apply search filter (searches all metadata fields)
+  if (state.searchQuery) {
+    const query = state.searchQuery.toLowerCase();
+    items = items.filter(f => {
+      if (f.name.toLowerCase().includes(query)) return true;
+      if (f.metadata) {
+        // Search all metadata fields
+        for (const value of Object.values(f.metadata)) {
+          if (value && typeof value === 'string' && value.toLowerCase().includes(query)) {
+            return true;
+          }
+        }
+      }
+      return false;
+    });
+  }
+  
+  // Sort items
+  items = sortItems(items);
+  
+  // Add parent folder navigation if in subfolder
+  if (state.currentPath.length > 0) {
     const parentItem = document.createElement('div');
     parentItem.className = 'file-item folder-item';
-    parentItem.innerHTML = `<span class="file-icon">📁</span><span class="file-name">..</span>`;
-    parentItem.addEventListener('click', () => {
-      const parentPath = currentPath.split('/').slice(0, -1).join('/') || slot.path;
-      loadFolderContents(parentPath);
-    });
+    parentItem.innerHTML = `
+      <div class="file-item-col file-col-name">
+        <span class="file-icon">📁</span>
+        <span class="file-name">Go Back</span>
+      </div>
+      <div class="file-item-col file-col-duration"></div>
+      <div class="file-item-col file-col-title"></div>
+      <div class="file-item-col file-col-artist"></div>
+      <div class="file-item-col file-col-album"></div>
+    `;
+    parentItem.addEventListener('click', () => navigateUp());
     elements.fileList.appendChild(parentItem);
   }
   
-  // Add folders
-  contents.folders.forEach(folder => {
-    const item = document.createElement('div');
-    item.className = 'file-item folder-item';
-    item.innerHTML = `<span class="file-icon">📁</span><span class="file-name">${folder.name}</span>`;
-    item.addEventListener('click', () => loadFolderContents(folder.path));
-    item.addEventListener('dblclick', () => loadFolderContents(folder.path));
-    elements.fileList.appendChild(item);
+  if (items.length === 0 && state.currentPath.length === 0) {
+    elements.fileList.innerHTML = state.searchQuery 
+      ? '<p class="file-list-empty">No files match your search.</p>'
+      : '<p class="file-list-empty">Select a directory to browse audio files.</p>';
+    return;
+  }
+  
+  items.forEach((item) => {
+    const div = document.createElement('div');
+    div.className = item.type === 'folder' ? 'file-item folder-item' : 'file-item';
+    div.draggable = item.type === 'file';
+    
+    // Add data attribute for metadata queue tracking (files only)
+    if (item.type === 'file' && item._originalIndex !== undefined) {
+      div.dataset.fileIndex = item._originalIndex;
+    }
+    
+    const icon = item.type === 'folder' ? '📁' : '🎵';
+    const title = item.metadata?.title || '';
+    const artist = item.metadata?.artist || '';
+    const album = item.metadata?.album || '';
+    const duration = item.metadata?.duration ? formatDuration(item.metadata.duration) : '';
+    
+    div.innerHTML = `
+      <div class="file-item-col file-col-name">
+        <span class="file-icon">${icon}</span>
+        <span class="file-name">${item.name}</span>
+      </div>
+      <div class="file-item-col file-col-duration">${duration}</div>
+      <div class="file-item-col file-col-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
+      <div class="file-item-col file-col-artist" title="${escapeHtml(artist)}">${escapeHtml(artist)}</div>
+      <div class="file-item-col file-col-album" title="${escapeHtml(album)}">${escapeHtml(album)}</div>
+    `;
+    
+    if (item.type === 'folder') {
+      div.addEventListener('click', () => navigateToFolder(item.name));
+      div.addEventListener('dblclick', () => navigateToFolder(item.name));
+    } else {
+      div.addEventListener('click', () => {
+        selectFile(div, item);
+        // Update the metadata preview panel
+        updateMetadataPreview(item);
+      });
+      div.addEventListener('dblclick', () => loadToFirstEmptyDeck(item));
+      
+      div.addEventListener('dragstart', (e) => {
+        // Store file in state (handles can't be serialized to JSON)
+        state.draggingFile = item;
+        e.dataTransfer.setData('text/plain', item.name);
+        e.dataTransfer.effectAllowed = 'copy';
+        div.classList.add('dragging');
+      });
+      
+      div.addEventListener('dragend', () => {
+        div.classList.remove('dragging');
+        // Clear after a short delay to allow drop to complete
+        setTimeout(() => { state.draggingFile = null; }, 100);
+      });
+      
+      div.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        showContextMenu(e, item);
+      });
+    }
+    
+    elements.fileList.appendChild(div);
   });
   
-  // Add files
-  contents.files.forEach(file => {
-    const item = document.createElement('div');
-    item.className = 'file-item';
-    item.draggable = true;
-    item.innerHTML = `<span class="file-icon">🎵</span><span class="file-name">${file.name}</span>`;
-    
-    item.addEventListener('click', () => selectFile(item, file));
-    item.addEventListener('dblclick', () => loadToFirstEmptyDeck(file.path, file.name));
-    
-    item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', file.path);
-      e.dataTransfer.setData('text/filename', file.name);
-      item.classList.add('dragging');
-    });
-    
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-    });
-    
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showContextMenu(e, file);
-    });
-    
-    elements.fileList.appendChild(item);
-  });
-  
-  if (contents.folders.length === 0 && contents.files.length === 0) {
-    elements.fileList.innerHTML = '<p class="file-list-empty">No audio files found in this folder.</p>';
+  // Check if we should focus the first file after navigation
+  if (state.focusFirstFileAfterNav) {
+    state.focusFirstFileAfterNav = false;
+    const fileCount = getAreaItemCount('files');
+    if (fileCount > 0) {
+      setKeyboardFocus('files', 0);
+    }
   }
 }
 
-// Select file
+// Helper to escape HTML
+function escapeHtml(text) {
+  if (!text) return '';
+  const div = document.createElement('div');
+  div.textContent = text;
+  return div.innerHTML;
+}
+
+// Update the fixed metadata preview panel at the bottom
+function updateMetadataPreview(item) {
+  if (!elements.metadataPreviewPanel) return;
+  
+  // Update filename
+  elements.metadataPreviewFilename.textContent = item.name;
+  
+  const metadata = item.metadata || {};
+  
+  // Get all metadata fields (including main columns for completeness)
+  const allFields = Object.entries(metadata)
+    .filter(([key, value]) => value)
+    .map(([key, value]) => {
+      const label = METADATA_LABELS[key] || key;
+      // Format duration as MM:SS
+      const displayVal = key === 'duration' ? formatDuration(value) : value;
+      return { key, label, value: displayVal };
+    });
+  
+  // If no metadata, show a message
+  if (allFields.length === 0) {
+    elements.metadataPreviewContent.innerHTML = '<div class="metadata-empty">No metadata available</div>';
+    return;
+  }
+  
+  // Create a grid of metadata fields
+  let html = '<div class="metadata-grid">';
+  allFields.forEach(({ label, value }) => {
+    // Truncate very long values (like lyrics)
+    const displayValue = value.length > 150 ? value.substring(0, 150) + '...' : value;
+    html += `
+      <div class="metadata-field">
+        <span class="metadata-label">${escapeHtml(label)}:</span>
+        <span class="metadata-value" title="${escapeHtml(value)}">${escapeHtml(displayValue)}</span>
+      </div>
+    `;
+  });
+  html += '</div>';
+  
+  elements.metadataPreviewContent.innerHTML = html;
+}
+
+// Clear the metadata preview panel
+function clearMetadataPreview() {
+  if (!elements.metadataPreviewPanel) return;
+  elements.metadataPreviewFilename.textContent = 'Select a file to view metadata';
+  elements.metadataPreviewContent.innerHTML = '';
+}
+
+// Column resizing state
+const columnResizeState = {
+  isResizing: false,
+  currentHandle: null,
+  currentCol: null,
+  startX: 0,
+  startWidth: 0
+};
+
+// Setup column resizing functionality
+function setupColumnResizing() {
+  const resizableCols = ['name', 'duration', 'title', 'artist']; // album is flex, doesn't need resize
+  
+  resizableCols.forEach(colName => {
+    const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
+    if (!headerCol) return;
+    
+    // Create resize handle
+    const handle = document.createElement('div');
+    handle.className = 'col-resize-handle';
+    handle.dataset.col = colName;
+    headerCol.appendChild(handle);
+    
+    handle.addEventListener('mousedown', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      startColumnResize(e, colName, headerCol);
+    });
+  });
+}
+
+function startColumnResize(e, colName, headerCol) {
+  columnResizeState.isResizing = true;
+  columnResizeState.currentCol = colName;
+  columnResizeState.startX = e.clientX;
+  columnResizeState.startWidth = headerCol.offsetWidth;
+  
+  const handle = headerCol.querySelector('.col-resize-handle');
+  if (handle) handle.classList.add('resizing');
+  
+  document.querySelector('.file-list-container').classList.add('resizing');
+  
+  document.addEventListener('mousemove', handleColumnResize);
+  document.addEventListener('mouseup', stopColumnResize);
+}
+
+function handleColumnResize(e) {
+  if (!columnResizeState.isResizing) return;
+  
+  const diff = e.clientX - columnResizeState.startX;
+  const newWidth = Math.max(50, columnResizeState.startWidth + diff);
+  
+  setColumnWidth(columnResizeState.currentCol, newWidth);
+}
+
+function stopColumnResize() {
+  if (!columnResizeState.isResizing) return;
+  
+  columnResizeState.isResizing = false;
+  
+  document.querySelectorAll('.col-resize-handle.resizing').forEach(h => {
+    h.classList.remove('resizing');
+  });
+  
+  document.querySelector('.file-list-container')?.classList.remove('resizing');
+  
+  document.removeEventListener('mousemove', handleColumnResize);
+  document.removeEventListener('mouseup', stopColumnResize);
+}
+
+function setColumnWidth(colName, width) {
+  // Update header column
+  const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
+  if (headerCol) {
+    headerCol.style.width = `${width}px`;
+  }
+  
+  // Update all file rows
+  document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
+    col.style.width = `${width}px`;
+  });
+}
+
+// Default column widths
+const DEFAULT_COLUMN_WIDTHS = {
+  name: 200,
+  duration: 75,
+  title: 120,
+  artist: 120
+};
+
+// Reset column widths to defaults (for both headers and data rows)
+function resetColumnWidths() {
+  Object.entries(DEFAULT_COLUMN_WIDTHS).forEach(([colName, width]) => {
+    const headerCol = elements.fileListHeader?.querySelector(`[data-sort="${colName}"]`);
+    if (headerCol) {
+      headerCol.style.width = `${width}px`;
+    }
+    document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
+      col.style.width = `${width}px`;
+    });
+  });
+}
+
+// Metadata panel resize state
+const metadataResizeState = {
+  isResizing: false,
+  startY: 0,
+  startHeight: 0
+};
+
+// Setup metadata panel resize functionality
+function setupMetadataPanelResize() {
+  const handle = elements.metadataResizeHandle;
+  const panel = elements.metadataPreviewPanel;
+  
+  // Load saved height
+  const savedHeight = localStorage.getItem('metadataPanelHeight');
+  if (savedHeight) {
+    panel.style.height = `${savedHeight}px`;
+  }
+  
+  handle.addEventListener('mousedown', (e) => {
+    e.preventDefault();
+    metadataResizeState.isResizing = true;
+    metadataResizeState.startY = e.clientY;
+    metadataResizeState.startHeight = panel.offsetHeight;
+    
+    handle.classList.add('resizing');
+    document.body.style.cursor = 'ns-resize';
+    document.body.style.userSelect = 'none';
+    
+    document.addEventListener('mousemove', handleMetadataPanelResize);
+    document.addEventListener('mouseup', stopMetadataPanelResize);
+  });
+}
+
+function handleMetadataPanelResize(e) {
+  if (!metadataResizeState.isResizing) return;
+  
+  const panel = elements.metadataPreviewPanel;
+  // Moving up increases height, moving down decreases
+  const diff = metadataResizeState.startY - e.clientY;
+  const newHeight = Math.max(60, Math.min(500, metadataResizeState.startHeight + diff));
+  
+  panel.style.height = `${newHeight}px`;
+}
+
+function stopMetadataPanelResize() {
+  if (!metadataResizeState.isResizing) return;
+  
+  metadataResizeState.isResizing = false;
+  
+  elements.metadataResizeHandle.classList.remove('resizing');
+  document.body.style.cursor = '';
+  document.body.style.userSelect = '';
+  
+  document.removeEventListener('mousemove', handleMetadataPanelResize);
+  document.removeEventListener('mouseup', stopMetadataPanelResize);
+  
+  // Save the height
+  const height = elements.metadataPreviewPanel.offsetHeight;
+  localStorage.setItem('metadataPanelHeight', height);
+}
+
+// Navigate to a subfolder (Electron version)
+function navigateToFolder(folderName) {
+  const newPath = [...state.currentPath, folderName];
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  if (slot.fullPath) {
+    loadDirectoryContents(slot.fullPath, newPath);
+  }
+}
+
+// Navigate up one level (Electron version)
+function navigateUp() {
+  if (state.currentPath.length > 0) {
+    const newPath = state.currentPath.slice(0, -1);
+    const slot = state.directorySlots[state.activeDirectorySlot];
+    if (slot.fullPath) {
+      loadDirectoryContents(slot.fullPath, newPath);
+    }
+  }
+}
+
+// Select file and enter click-to-assign mode
 function selectFile(element, file) {
   document.querySelectorAll('.file-item').forEach(item => item.classList.remove('selected'));
   element.classList.add('selected');
   state.selectedFile = file;
+  
+  // Enter click-to-assign mode
+  enterClickToAssignMode();
+}
+
+// Enter click-to-assign mode
+function enterClickToAssignMode() {
+  state.clickToAssignMode = true;
+  state.slotInput = '';
+  
+  // Add visual indicator to all decks and hot buttons
+  document.querySelectorAll('.audio-deck').forEach(deck => {
+    deck.classList.add('awaiting-file');
+  });
+  document.querySelectorAll('.hot-button').forEach(btn => {
+    btn.classList.add('awaiting-file');
+  });
+  
+  setStatus(`"${state.selectedFile.name}" - Click a slot OR type 1-20 + Enter`);
+}
+
+// Exit click-to-assign mode
+function exitClickToAssignMode() {
+  state.clickToAssignMode = false;
+  state.selectedFile = null;
+  state.slotInput = '';
+  
+  // Remove visual indicators
+  document.querySelectorAll('.audio-deck').forEach(deck => {
+    deck.classList.remove('awaiting-file');
+  });
+  document.querySelectorAll('.hot-button').forEach(btn => {
+    btn.classList.remove('awaiting-file');
+  });
+  document.querySelectorAll('.file-item').forEach(item => {
+    item.classList.remove('selected');
+  });
+  
+  // Clear file assign message
+  updateFileAssignMessage('');
+}
+
+// Update the file assign message in the file browser
+function updateFileAssignMessage(slotInput) {
+  if (!elements.fileAssignMessage) return;
+  
+  if (slotInput && state.selectedFile) {
+    elements.fileAssignMessage.textContent = `assign ${state.selectedFile.name} to hot button ${slotInput}`;
+    elements.fileAssignMessage.classList.add('visible');
+  } else {
+    elements.fileAssignMessage.textContent = '';
+    elements.fileAssignMessage.classList.remove('visible');
+  }
+}
+
+// Toggle layout between 20x1 and 10x2
+function toggleLayout() {
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  
+  if (state.layout === '20x1') {
+    state.layout = '10x2';
+    elements.audioDecksPanel.classList.add('layout-10x2');
+    elements.btnLayoutToggle.classList.add('active');
+    elements.btnLayoutToggle.querySelector('.layout-label').textContent = '10×2';
+    elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▦';
+    // Show column resize handle
+    if (columnResizeHandle) columnResizeHandle.style.display = 'block';
+    // Load saved column widths
+    loadColumnWidths();
+  } else {
+    state.layout = '20x1';
+    elements.audioDecksPanel.classList.remove('layout-10x2');
+    elements.btnLayoutToggle.classList.remove('active');
+    elements.btnLayoutToggle.querySelector('.layout-label').textContent = '20×1';
+    elements.btnLayoutToggle.querySelector('.layout-icon').textContent = '▤';
+    // Hide column resize handle
+    if (columnResizeHandle) columnResizeHandle.style.display = 'none';
+  }
+  setStatus(`Layout changed to ${state.layout}`);
+}
+
+// Setup resize handle for audio decks panel
+function setupResizeHandle() {
+  const resizeHandle = document.getElementById('audioDecksResizeHandle');
+  const audioDecksPanel = elements.audioDecksPanel;
+  let isResizing = false;
+  let startX = 0;
+  let startWidth = 0;
+
+  resizeHandle.addEventListener('mousedown', (e) => {
+    isResizing = true;
+    startX = e.clientX;
+    startWidth = parseInt(window.getComputedStyle(audioDecksPanel).width, 10);
+    audioDecksPanel.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const width = startWidth + e.clientX - startX;
+    const minWidth = audioDecksPanel.classList.contains('layout-10x2') ? 480 : 340;
+    const newWidth = Math.max(minWidth, width);
+    
+    audioDecksPanel.style.width = `${newWidth}px`;
+    
+    // For 10x2 layout, update the width
+    if (audioDecksPanel.classList.contains('layout-10x2')) {
+      // Width is set via style, so it overrides the CSS
+    }
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      audioDecksPanel.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save width preference
+      const width = parseInt(window.getComputedStyle(audioDecksPanel).width, 10);
+      localStorage.setItem('audioDecksPanelWidth', width);
+    }
+  });
+}
+
+// Setup column resize handle for 10x2 layout
+function setupColumnResizeHandle() {
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  const audioDecks = document.getElementById('audioDecks');
+  if (!columnResizeHandle || !audioDecks) return;
+  
+  let isResizing = false;
+  let startX = 0;
+  let startCol1Percent = 50;
+
+  columnResizeHandle.addEventListener('mousedown', (e) => {
+    if (!elements.audioDecksPanel.classList.contains('layout-10x2')) return;
+    
+    isResizing = true;
+    startX = e.clientX;
+    startCol1Percent = parseFloat(audioDecks.style.getPropertyValue('--col1-width-percent') || '50');
+    columnResizeHandle.classList.add('resizing');
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener('mousemove', (e) => {
+    if (!isResizing) return;
+    
+    const panelWidth = elements.audioDecksPanel.offsetWidth;
+    const panelPadding = 20; // Approximate padding
+    const availableWidth = panelWidth - panelPadding;
+    const deltaX = e.clientX - startX;
+    const deltaPercent = (deltaX / availableWidth) * 100;
+    
+    let newCol1Percent = startCol1Percent + deltaPercent;
+    // Constrain between 20% and 80%
+    newCol1Percent = Math.max(20, Math.min(80, newCol1Percent));
+    const col2Percent = 100 - newCol1Percent;
+    
+    // Update CSS variables
+    audioDecks.style.setProperty('--col1-width-percent', `${newCol1Percent}%`);
+    audioDecks.style.setProperty('--col1-width', `${newCol1Percent}%`);
+    audioDecks.style.setProperty('--col2-width', `${col2Percent}%`);
+    
+    // Update handle position
+    columnResizeHandle.style.left = `calc(${newCol1Percent}% - 2px)`;
+  });
+
+  document.addEventListener('mouseup', () => {
+    if (isResizing) {
+      isResizing = false;
+      columnResizeHandle.classList.remove('resizing');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+      
+      // Save column width preference
+      const col1Percent = parseFloat(audioDecks.style.getPropertyValue('--col1-width-percent') || '50');
+      localStorage.setItem('audioDecksColumnWidth', col1Percent);
+    }
+  });
+}
+
+// Load saved column widths for 10x2 layout
+function loadColumnWidths() {
+  const audioDecks = document.getElementById('audioDecks');
+  const columnResizeHandle = document.getElementById('columnResizeHandle');
+  if (!audioDecks || !elements.audioDecksPanel.classList.contains('layout-10x2')) return;
+  
+  const savedCol1Percent = localStorage.getItem('audioDecksColumnWidth');
+  if (savedCol1Percent) {
+    const col1Percent = parseFloat(savedCol1Percent);
+    const col2Percent = 100 - col1Percent;
+    
+    audioDecks.style.setProperty('--col1-width-percent', `${col1Percent}%`);
+    audioDecks.style.setProperty('--col1-width', `${col1Percent}%`);
+    audioDecks.style.setProperty('--col2-width', `${col2Percent}%`);
+    
+    if (columnResizeHandle) {
+      columnResizeHandle.style.left = `calc(${col1Percent}% - 2px)`;
+    }
+  }
 }
 
 // Show context menu
@@ -553,6 +1879,7 @@ function showContextMenu(e, file) {
   elements.contextMenu.style.left = `${e.clientX}px`;
   elements.contextMenu.style.top = `${e.clientY}px`;
   
+  // Setup context menu actions
   elements.contextMenu.querySelectorAll('.context-item').forEach(item => {
     item.onclick = () => {
       const action = item.dataset.action;
@@ -566,14 +1893,16 @@ function handleContextAction(action, file, e) {
   elements.contextMenu.style.display = 'none';
   
   if (action === 'load-deck' || action === 'assign-hot') {
+    // Show deck selection submenu
     elements.deckSelectMenu.style.display = 'block';
     elements.deckSelectMenu.style.left = `${e.clientX + 150}px`;
     elements.deckSelectMenu.style.top = `${e.clientY}px`;
     
+    // Setup deck selection
     elements.deckSelectMenu.querySelectorAll('.deck-select-item').forEach(item => {
       item.onclick = () => {
         const deckNum = item.dataset.deck;
-        loadToDeck(deckNum, file.path, file.name);
+        loadToDeck(deckNum, file);
         elements.deckSelectMenu.style.display = 'none';
       };
     });
@@ -581,92 +1910,84 @@ function handleContextAction(action, file, e) {
 }
 
 // Perform search
-async function performSearch() {
-  const query = elements.searchInput.value.trim();
-  if (!query) {
-    state.searchQuery = '';
-    const slot = state.directorySlots[state.activeDirectorySlot];
-    if (slot.currentPath) {
-      loadFolderContents(slot.currentPath);
-    }
-    return;
+function performSearch() {
+  state.searchQuery = elements.searchInput.value.trim();
+  renderFileList();
+  
+  if (state.searchQuery) {
+    const count = state.currentFiles.filter(f => 
+      f.name.toLowerCase().includes(state.searchQuery.toLowerCase())
+    ).length;
+    setStatus(`Found ${count} item(s) matching "${state.searchQuery}"`);
   }
-  
-  const slot = state.directorySlots[state.activeDirectorySlot];
-  if (!slot.path) {
-    setStatus('Please select a directory first');
-    return;
-  }
-  
-  state.searchQuery = query;
-  setStatus('Searching...');
-  const results = await window.electronAPI.searchAudioFiles(slot.path, query);
-  
-  elements.fileList.innerHTML = '';
-  
-  if (results.length === 0) {
-    elements.fileList.innerHTML = '<p class="file-list-empty">No files found matching your search.</p>';
-    setStatus('No results found');
-    return;
-  }
-  
-  results.forEach(file => {
-    const item = document.createElement('div');
-    item.className = 'file-item';
-    item.draggable = true;
-    item.innerHTML = `<span class="file-icon">🎵</span><span class="file-name">${file.name}</span>`;
-    
-    item.addEventListener('click', () => selectFile(item, file));
-    item.addEventListener('dblclick', () => loadToFirstEmptyDeck(file.path, file.name));
-    
-    item.addEventListener('dragstart', (e) => {
-      e.dataTransfer.setData('text/plain', file.path);
-      e.dataTransfer.setData('text/filename', file.name);
-      item.classList.add('dragging');
-    });
-    
-    item.addEventListener('dragend', () => {
-      item.classList.remove('dragging');
-    });
-    
-    item.addEventListener('contextmenu', (e) => {
-      e.preventDefault();
-      showContextMenu(e, file);
-    });
-    
-    elements.fileList.appendChild(item);
-  });
-  
-  setStatus(`Found ${results.length} files`);
 }
 
-// Load to deck (and sync with hot button)
-function loadToDeck(deckNum, filePath, fileName) {
+// Load to deck (Electron version - uses file paths)
+async function loadToDeck(deckNum, file) {
   deckNum = parseInt(deckNum);
-  const audio = state.decks[deckNum].audio;
-  audio.src = filePath;
-  state.decks[deckNum].file = { path: filePath, name: fileName };
   
-  // Connect audio analyser for visualizer (if not already connected)
-  connectAudioAnalyser(deckNum);
+  try {
+    // Use file:// protocol for local files
+    const url = 'file://' + file.path;
+    
+    const audio = state.decks[deckNum].audio;
+    
+    // Clear old source
+    audio.src = '';
+    
+    audio.src = url;
+    state.decks[deckNum].file = { name: file.name, url: url, path: file.path };
+    
+    // Connect audio analyser for visualizer (if not already connected)
+    connectAudioAnalyser(deckNum);
+    
+    // Update filename with marquee scrolling for long names
+    updateDeckFilename(deckNum, file.name);
+    updateDeckState(deckNum, 'loaded');
+    
+    // Sync with hot button display
+    updateHotButtonDisplay(deckNum);
+    
+    setStatus(`Loaded: ${file.name}`);
+  } catch (err) {
+    console.error('Error loading file:', err);
+    setStatus('Error loading file');
+  }
+}
+
+// Update deck filename with marquee scrolling for long names
+function updateDeckFilename(deckNum, filename) {
+  const filenameEl = document.getElementById(`deckFilename${deckNum}`);
   
-  document.getElementById(`deckFilename${deckNum}`).textContent = fileName || 'Loading...';
-  updateDeckState(deckNum, 'loaded');
-  updateHotButtonDisplay(deckNum);
-  saveHotButtons();
+  // Create inner span for marquee animation
+  filenameEl.innerHTML = `<span class="deck-filename-inner">${filename}</span>`;
   
-  setStatus(`Loaded: ${fileName}`);
+  // Check if text is longer than container (needs scrolling)
+  const innerSpan = filenameEl.querySelector('.deck-filename-inner');
+  
+  // Use requestAnimationFrame to ensure DOM is updated before measuring
+  requestAnimationFrame(() => {
+    const containerWidth = filenameEl.offsetWidth;
+    const textWidth = innerSpan.scrollWidth;
+    
+    if (textWidth > containerWidth) {
+      filenameEl.classList.add('scrolling');
+    } else {
+      filenameEl.classList.remove('scrolling');
+    }
+  });
 }
 
 // Load to first empty deck
-function loadToFirstEmptyDeck(filePath, fileName) {
+function loadToFirstEmptyDeck(file) {
   for (let i = 1; i <= DECK_COUNT; i++) {
     if (!state.decks[i].file) {
-      loadToDeck(i, filePath, fileName);
+      loadToDeck(i, file);
       return i;
     }
   }
-  loadToDeck(1, filePath, fileName);
+  // All decks full, load to deck 1
+  loadToDeck(1, file);
   return 1;
 }
 
@@ -713,6 +2034,7 @@ function stopDeck(deckNum) {
 function clearDeck(deckNum) {
   deckNum = parseInt(deckNum);
   const audio = state.decks[deckNum].audio;
+  
   audio.pause();
   audio.src = '';
   audio.currentTime = 0;
@@ -720,7 +2042,18 @@ function clearDeck(deckNum) {
   state.decks[deckNum].playing = false;
   state.decks[deckNum].queued = false;
   
-  document.getElementById(`deckFilename${deckNum}`).textContent = '-- Empty --';
+  // Reset deck volume to 100%
+  const volumeSlider = document.querySelector(`.deck-volume[data-deck="${deckNum}"]`);
+  if (volumeSlider) {
+    volumeSlider.value = 100;
+    audio.volume = state.masterVolume;
+  }
+  
+  // Reset filename display (remove scrolling class and inner span)
+  const filenameEl = document.getElementById(`deckFilename${deckNum}`);
+  filenameEl.classList.remove('scrolling');
+  filenameEl.textContent = '-- Empty --';
+  
   document.getElementById(`deckElapsed${deckNum}`).textContent = '00:00';
   document.getElementById(`deckLength${deckNum}`).textContent = '00:00';
   document.getElementById(`deckRemaining${deckNum}`).textContent = '-00:00';
@@ -729,9 +2062,45 @@ function clearDeck(deckNum) {
   updateDeckState(deckNum, 'empty');
   updateHotButtonDisplay(deckNum);
   updateQueueButtonState(deckNum);
-  saveHotButtons();
+}
+
+// Swap contents between two decks
+function swapDecks(slot1, slot2) {
+  slot1 = parseInt(slot1);
+  slot2 = parseInt(slot2);
   
-  setStatus(`Cleared deck ${deckNum}`);
+  if (slot1 === slot2) return;
+  
+  const deck1 = state.decks[slot1];
+  const deck2 = state.decks[slot2];
+  
+  // Stop both decks if playing
+  if (deck1.playing) stopDeck(slot1);
+  if (deck2.playing) stopDeck(slot2);
+  
+  // Store references to the files
+  const file1 = deck1.file;
+  const file2 = deck2.file;
+  const queued1 = deck1.queued;
+  const queued2 = deck2.queued;
+  
+  // Clear both decks first
+  clearDeck(slot1);
+  clearDeck(slot2);
+  
+  // Load files into swapped positions
+  if (file2) {
+    loadToDeck(slot1, file2);
+    state.decks[slot1].queued = queued2;
+    updateQueueButtonState(slot1);
+  }
+  if (file1) {
+    loadToDeck(slot2, file1);
+    state.decks[slot2].queued = queued1;
+    updateQueueButtonState(slot2);
+  }
+  
+  setStatus(`Swapped slots ${slot1} and ${slot2}`);
 }
 
 // Toggle queue state for a deck
@@ -741,19 +2110,38 @@ function toggleQueue(deckNum) {
   updateQueueButtonState(deckNum);
   
   if (state.decks[deckNum].queued) {
-    setStatus(`Deck ${deckNum} queued to play after deck ${deckNum - 1}`);
+    // Show wrap-around message for deck 1
+    const prevDeck = deckNum === 1 ? DECK_COUNT : deckNum - 1;
+    if (deckNum === 1) {
+      setStatus(`Deck 1 queued to play after deck 20 (wrap-around)`);
+    } else {
+      setStatus(`Deck ${deckNum} queued to play after deck ${prevDeck}`);
+    }
   } else {
     setStatus(`Deck ${deckNum} removed from queue`);
   }
 }
 
-// Update queue button visual state
+// Update queue button visual state (both audio deck and hot button)
 function updateQueueButtonState(deckNum) {
-  const btn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
-  if (state.decks[deckNum].queued) {
-    btn.classList.add('active');
-  } else {
-    btn.classList.remove('active');
+  // Update audio deck queue button
+  const deckBtn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
+  if (deckBtn) {
+    if (state.decks[deckNum].queued) {
+      deckBtn.classList.add('active');
+    } else {
+      deckBtn.classList.remove('active');
+    }
+  }
+  
+  // Update hot button queue button
+  const hotBtn = document.querySelector(`.btn-hot-queue[data-slot="${deckNum}"]`);
+  if (hotBtn) {
+    if (state.decks[deckNum].queued) {
+      hotBtn.classList.add('active');
+    } else {
+      hotBtn.classList.remove('active');
+    }
   }
 }
 
@@ -795,31 +2183,65 @@ function updateHotButtonState(deckNum, buttonState) {
   }
 }
 
-// Update hot button display (sync with deck)
+// Update hot button display (sync with deck) with marquee scrolling for long names
 function updateHotButtonDisplay(deckNum) {
   const button = document.querySelector(`.hot-button[data-slot="${deckNum}"]`);
   const label = button.querySelector('.hot-label');
   
   if (state.decks[deckNum].file) {
-    label.textContent = state.decks[deckNum].file.name.replace(/\.[^/.]+$/, '');
+    const filename = state.decks[deckNum].file.name.replace(/\.[^/.]+$/, '');
+    label.innerHTML = `<span class="hot-label-inner">${filename}</span>`;
     button.classList.add('assigned');
+    
+    // Check if text is longer than container (needs scrolling)
+    requestAnimationFrame(() => {
+      const innerSpan = label.querySelector('.hot-label-inner');
+      if (innerSpan) {
+        const containerWidth = label.offsetWidth;
+        const textWidth = innerSpan.scrollWidth;
+        
+        if (textWidth > containerWidth) {
+          label.classList.add('scrolling');
+        } else {
+          label.classList.remove('scrolling');
+        }
+      }
+    });
   } else {
-    label.textContent = 'Empty';
+    label.innerHTML = '<span class="hot-label-inner">Empty</span>';
+    label.classList.remove('scrolling');
     button.classList.remove('assigned', 'playing');
   }
 }
 
-// On deck ended - check sequential queue
+// On deck ended - check sequential queue, then auto-clear
 function onDeckEnded(deckNum) {
   deckNum = parseInt(deckNum);
-  updateDeckState(deckNum, 'loaded');
-  updateHotButtonState(deckNum, 'stopped');
   state.decks[deckNum].playing = false;
   
-  const nextDeck = deckNum + 1;
-  if (nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file) {
+  // Restore deck volume to 100%
+  const volumeSlider = document.querySelector(`.deck-volume[data-deck="${deckNum}"]`);
+  if (volumeSlider) {
+    volumeSlider.value = 100;
+    state.decks[deckNum].audio.volume = state.masterVolume;
+  }
+  
+  // Check if next deck is queued BEFORE clearing (with wrap-around: 20 -> 1)
+  const nextDeck = deckNum === DECK_COUNT ? 1 : deckNum + 1;
+  const shouldPlayNext = state.decks[nextDeck].queued && state.decks[nextDeck].file;
+  
+  // Auto-clear the deck that just finished
+  clearDeck(deckNum);
+  setStatus(`Deck ${deckNum} finished and cleared`);
+  
+  // Now play the next queued deck if applicable (supports wrap-around)
+  if (shouldPlayNext) {
     playDeck(nextDeck);
-    setStatus(`Auto-playing queued deck ${nextDeck}`);
+    if (deckNum === DECK_COUNT && nextDeck === 1) {
+      setStatus(`Auto-playing queued deck 1 (wrapped from deck 20)`);
+    } else {
+      setStatus(`Auto-playing queued deck ${nextDeck}`);
+    }
   }
 }
 
@@ -840,54 +2262,403 @@ function formatTime(seconds) {
   return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
 }
 
-// Save hot buttons (synced with decks)
-async function saveHotButtons() {
-  const hotButtonData = {};
-  for (let i = 1; i <= DECK_COUNT; i++) {
-    if (state.decks[i].file) {
-      hotButtonData[i] = {
-        path: state.decks[i].file.path,
-        name: state.decks[i].file.name
-      };
+// Keyboard focus management
+function clearKeyboardFocus() {
+  document.querySelectorAll('.keyboard-focus').forEach(el => {
+    el.classList.remove('keyboard-focus');
+  });
+}
+
+function setKeyboardFocus(area, index) {
+  clearKeyboardFocus();
+  state.keyboardFocus.area = area;
+  state.keyboardFocus.index = index;
+  
+  let element = null;
+  
+  if (area === 'files') {
+    const fileItems = document.querySelectorAll('.file-item');
+    if (fileItems.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, fileItems.length - 1));
+      element = fileItems[state.keyboardFocus.index];
+    }
+  } else if (area === 'decks') {
+    const decks = document.querySelectorAll('.audio-deck');
+    if (decks.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, decks.length - 1));
+      element = decks[state.keyboardFocus.index];
+    }
+  } else if (area === 'hotbuttons') {
+    const buttons = document.querySelectorAll('.hot-button');
+    if (buttons.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, buttons.length - 1));
+      element = buttons[state.keyboardFocus.index];
+    }
+  } else if (area === 'dirslots') {
+    const slots = document.querySelectorAll('.directory-slot');
+    if (slots.length > 0) {
+      state.keyboardFocus.index = Math.max(0, Math.min(index, slots.length - 1));
+      element = slots[state.keyboardFocus.index];
     }
   }
-  await window.electronAPI.saveHotButtons(hotButtonData);
+  
+  if (element) {
+    element.classList.add('keyboard-focus');
+    element.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+}
+
+function getAreaItemCount(area) {
+  if (area === 'files') {
+    return document.querySelectorAll('.file-item').length;
+  } else if (area === 'decks') {
+    return document.querySelectorAll('.audio-deck').length;
+  } else if (area === 'hotbuttons') {
+    return document.querySelectorAll('.hot-button').length;
+  } else if (area === 'dirslots') {
+    return document.querySelectorAll('.directory-slot').length;
+  }
+  return 0;
+}
+
+function handleArrowNavigation(direction) {
+  const { area, index } = state.keyboardFocus;
+  
+  // If no focus yet, start at Hot Button 5
+  if (!area) {
+    setKeyboardFocus('hotbuttons', 4); // Hot Button 5 (0-indexed)
+    return;
+  }
+  
+  // === AUDIO DECKS ===
+  if (area === 'decks') {
+    const deckCount = getAreaItemCount('decks');
+    const deckNum = index + 1; // 1-based deck number
+    
+    // Check if we're in 10x2 layout (2 columns of decks)
+    const is10x2 = state.layout === '10x2';
+    
+    if (is10x2) {
+      // === 10x2 LAYOUT: Decks in 2 columns (1-10 left, 11-20 right) ===
+      if (direction === 'up') {
+        if (deckNum === 1) {
+          // From deck 1, wrap to deck 10
+          setKeyboardFocus('decks', 9);
+        } else if (deckNum === 11) {
+          // From deck 11, wrap to deck 20
+          setKeyboardFocus('decks', 19);
+        } else {
+          setKeyboardFocus('decks', index - 1);
+        }
+      } else if (direction === 'down') {
+        if (deckNum === 10) {
+          // From deck 10, wrap to deck 1
+          setKeyboardFocus('decks', 0);
+        } else if (deckNum === 20) {
+          // From deck 20, wrap to deck 11
+          setKeyboardFocus('decks', 10);
+        } else {
+          setKeyboardFocus('decks', index + 1);
+        }
+      } else if (direction === 'right') {
+        if (deckNum <= 10) {
+          // Right from deck 1-10 goes to deck N+10 (right column)
+          setKeyboardFocus('decks', index + 10);
+        } else {
+          // Right from deck 11-20 goes to hot button N-10
+          setKeyboardFocus('hotbuttons', index - 10);
+        }
+      } else if (direction === 'left') {
+        if (deckNum <= 10) {
+          // Left from deck 1-10 goes to first file if exists, else Select Folder 2
+          const fileCount = getAreaItemCount('files');
+          if (fileCount > 0) {
+            setKeyboardFocus('files', 0);
+          } else {
+            setKeyboardFocus('dirslots', 1);
+          }
+        } else {
+          // Left from deck 11-20 goes to deck N-10 (left column)
+          setKeyboardFocus('decks', index - 10);
+        }
+      }
+    } else {
+      // === 20x1 LAYOUT: Decks in single column (1-20 vertical) ===
+      if (direction === 'up') {
+        if (index === 0) {
+          // From deck 1, wrap to deck 20
+          setKeyboardFocus('decks', deckCount - 1);
+        } else {
+          setKeyboardFocus('decks', index - 1);
+        }
+      } else if (direction === 'down') {
+        if (index === deckCount - 1) {
+          // From deck 20, wrap to deck 1
+          setKeyboardFocus('decks', 0);
+        } else {
+          setKeyboardFocus('decks', index + 1);
+        }
+      } else if (direction === 'right') {
+        // Right from deck N goes to hot button N
+        setKeyboardFocus('hotbuttons', index);
+      } else if (direction === 'left') {
+        // Any deck in 20x1: left goes to first file if exists, else Select Folder 2
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        } else {
+          setKeyboardFocus('dirslots', 1);
+        }
+      }
+    }
+    return;
+  }
+  
+  // === HOT BUTTONS (2-column: 1-10 left, 11-20 right, wrapping within columns) ===
+  if (area === 'hotbuttons') {
+    const slot = index + 1; // slot number is 1-based
+    const is10x2 = state.layout === '10x2';
+    
+    if (direction === 'up') {
+      if (slot === 1) {
+        // From slot 1, wrap to slot 10
+        setKeyboardFocus('hotbuttons', 9);
+      } else if (slot === 11) {
+        // From slot 11, wrap to slot 20
+        setKeyboardFocus('hotbuttons', 19);
+      } else {
+        // Move up within column
+        setKeyboardFocus('hotbuttons', index - 1);
+      }
+    } else if (direction === 'down') {
+      if (slot === 10) {
+        // From slot 10, wrap to slot 1
+        setKeyboardFocus('hotbuttons', 0);
+      } else if (slot === 20) {
+        // From slot 20, wrap to slot 11
+        setKeyboardFocus('hotbuttons', 10);
+      } else {
+        // Move down within column
+        setKeyboardFocus('hotbuttons', index + 1);
+      }
+    } else if (direction === 'right') {
+      if (slot <= 10) {
+        // From left column (1-10), go to right column (11-20)
+        setKeyboardFocus('hotbuttons', index + 10);
+      } else if (slot <= 12) {
+        // From slots 11-12, go to Select Folder 1
+        setKeyboardFocus('dirslots', 0);
+      } else {
+        // From slots 13-20, go to first file in file list
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        } else {
+          // If no files, go to Select Folder 1
+          setKeyboardFocus('dirslots', 0);
+        }
+      }
+    } else if (direction === 'left') {
+      if (slot > 10) {
+        // From right column (11-20), go to left column (1-10)
+        setKeyboardFocus('hotbuttons', index - 10);
+      } else {
+        // From left column (1-10)
+        if (is10x2) {
+          // In 10x2 layout, go to deck N+10
+          setKeyboardFocus('decks', index + 10);
+        } else {
+          // In 20x1 layout, go to corresponding deck N
+          setKeyboardFocus('decks', index);
+        }
+      }
+    }
+    return;
+  }
+  
+  // === DIRECTORY SLOTS (2x2 grid: SF1=top-left, SF2=top-right, SF3=bottom-left, SF4=bottom-right) ===
+  if (area === 'dirslots') {
+    const slotNum = index + 1; // 1-based: 1, 2, 3, 4
+    
+    if (direction === 'up') {
+      if (slotNum === 3) {
+        // SF3 -> SF1
+        setKeyboardFocus('dirslots', 0);
+      } else if (slotNum === 4) {
+        // SF4 -> SF2
+        setKeyboardFocus('dirslots', 1);
+      }
+      // SF1 and SF2 at top, no up action
+    } else if (direction === 'down') {
+      if (slotNum === 1) {
+        // SF1 -> SF3
+        setKeyboardFocus('dirslots', 2);
+      } else if (slotNum === 2) {
+        // SF2 -> SF4
+        setKeyboardFocus('dirslots', 3);
+      } else if (slotNum === 3 || slotNum === 4) {
+        // SF3 or SF4 -> first file in search results
+        const fileCount = getAreaItemCount('files');
+        if (fileCount > 0) {
+          setKeyboardFocus('files', 0);
+        }
+      }
+    } else if (direction === 'left') {
+      if (slotNum === 2) {
+        // SF2 -> SF1
+        setKeyboardFocus('dirslots', 0);
+      } else if (slotNum === 4) {
+        // SF4 -> SF3
+        setKeyboardFocus('dirslots', 2);
+      } else if (slotNum === 1 || slotNum === 3) {
+        // SF1 or SF3 -> Hot Button 11
+        setKeyboardFocus('hotbuttons', 10);
+      }
+    } else if (direction === 'right') {
+      if (slotNum === 1) {
+        // SF1 -> SF2
+        setKeyboardFocus('dirslots', 1);
+      } else if (slotNum === 3) {
+        // SF3 -> SF4
+        setKeyboardFocus('dirslots', 3);
+      } else if (slotNum === 2 || slotNum === 4) {
+        // SF2 or SF4 -> Audio Deck Card 1
+        setKeyboardFocus('decks', 0);
+      }
+    }
+    return;
+  }
+  
+  // === FILES (with wrapping) ===
+  if (area === 'files') {
+    const count = getAreaItemCount('files');
+    
+    if (direction === 'up') {
+      if (index === 0) {
+        // From first file, wrap to last file
+        setKeyboardFocus('files', count - 1);
+      } else {
+        setKeyboardFocus('files', index - 1);
+      }
+    } else if (direction === 'down') {
+      if (index === count - 1) {
+        // From last file, wrap to first file
+        setKeyboardFocus('files', 0);
+      } else {
+        setKeyboardFocus('files', index + 1);
+      }
+    } else if (direction === 'left') {
+      // Left from files goes to Hot Button 13
+      setKeyboardFocus('hotbuttons', 12);
+    } else if (direction === 'right') {
+      // Right from files goes to decks
+      setKeyboardFocus('decks', Math.min(index, getAreaItemCount('decks') - 1));
+    }
+    return;
+  }
+}
+
+function handleFocusedItemAction(action) {
+  const { area, index } = state.keyboardFocus;
+  if (!area) return false;
+  
+  if (area === 'files') {
+    const fileItems = document.querySelectorAll('.file-item');
+    if (fileItems[index]) {
+      if (action === 'enter') {
+        // Check if it's a folder
+        if (fileItems[index].classList.contains('folder-item')) {
+          // Set flag to focus first file after navigation
+          state.focusFirstFileAfterNav = true;
+          // Click to navigate into folder
+          fileItems[index].click();
+        } else {
+          // Regular file - click to select for assignment
+          fileItems[index].click();
+        }
+        return true;
+      }
+    }
+  } else if (area === 'decks') {
+    const decks = document.querySelectorAll('.audio-deck');
+    if (decks[index]) {
+      const deckNum = parseInt(decks[index].dataset.deck);
+      if (action === 'enter') {
+        // Play the deck
+        if (state.decks[deckNum].file) {
+          playDeck(deckNum);
+        }
+        return true;
+      } else if (action === 'backspace') {
+        // Clear the deck
+        clearDeck(deckNum);
+        return true;
+      } else if (action === 'queue') {
+        // Toggle queue for the deck
+        toggleQueue(deckNum);
+        return true;
+      }
+    }
+  } else if (area === 'hotbuttons') {
+    const buttons = document.querySelectorAll('.hot-button');
+    if (buttons[index]) {
+      const slot = parseInt(buttons[index].dataset.slot);
+      if (action === 'enter') {
+        // Play the hot button
+        if (state.decks[slot].file) {
+          playDeck(slot);
+        }
+        return true;
+      } else if (action === 'backspace') {
+        // Clear the slot
+        clearDeck(slot);
+        return true;
+      } else if (action === 'queue') {
+        // Toggle queue for the slot
+        toggleQueue(slot);
+        return true;
+      }
+    }
+  } else if (area === 'dirslots') {
+    const slots = document.querySelectorAll('.directory-slot');
+    if (slots[index]) {
+      const slotNum = parseInt(slots[index].dataset.slot);
+      if (action === 'enter') {
+        // Trigger folder selection for this directory slot
+        selectDirectory(slotNum);
+        return true;
+      }
+    }
+  }
+  return false;
 }
 
 // Keyboard shortcuts
 function handleKeyboard(e) {
-  // Don't trigger shortcuts when typing in input
+  // Don't trigger shortcuts when typing in input fields
   if (e.target.matches('input')) return;
   
-  // Number keys 1-9 and 0 for decks (0 = deck 10)
-  if (!e.ctrlKey && !e.altKey) {
-    if (e.key >= '1' && e.key <= '9') {
-      const deckNum = parseInt(e.key);
-      if (e.shiftKey) {
-        stopDeck(deckNum);
-      } else {
-        playDeck(deckNum);
-      }
-      e.preventDefault();
-    } else if (e.key === '0') {
-      if (e.shiftKey) {
-        stopDeck(10);
-      } else {
-        playDeck(10);
-      }
-      e.preventDefault();
-    }
+  // If keyboard shortcuts are disabled, exit early
+  if (!state.keyboardEnabled) return;
+  
+  // Show debug info if debug mode is on
+  if (state.debugMode && elements.debugOverlay) {
+    elements.debugOverlay.textContent = `Key: ${e.key}`;
   }
   
-  // Function keys F1-F12 for decks 1-12
-  if (e.key.startsWith('F') && !e.ctrlKey && !e.altKey) {
-    const num = parseInt(e.key.slice(1));
-    if (num >= 1 && num <= 12) {
-      if (state.decks[num].file) {
-        playDeck(num);
+  // Toggle debug mode with 'b' (only when not in click-to-assign mode)
+  if ((e.key === 'b' || e.key === 'B') && !state.clickToAssignMode) {
+    state.debugMode = !state.debugMode;
+    if (elements.debugOverlay) {
+      if (state.debugMode) {
+        elements.debugOverlay.classList.add('visible');
+        elements.debugOverlay.textContent = 'Debug ON';
+      } else {
+        elements.debugOverlay.classList.remove('visible');
       }
-      e.preventDefault();
     }
+    e.preventDefault();
+    return;
   }
   
   // Space to play/pause deck 1
@@ -901,22 +2672,114 @@ function handleKeyboard(e) {
       }
     }
     e.preventDefault();
+    return;
   }
   
-  // Escape to close context menu
+  // Escape to close context menu and exit click-to-assign mode
   if (e.key === 'Escape') {
     elements.contextMenu.style.display = 'none';
     elements.deckSelectMenu.style.display = 'none';
+    if (state.clickToAssignMode) {
+      state.slotInput = '';
+      updateFileAssignMessage('');
+      exitClickToAssignMode();
+      setStatus('Assignment cancelled');
+    }
+    clearKeyboardFocus();
+    return;
   }
   
-  // Backspace to navigate up
-  if (e.key === 'Backspace' && !e.target.matches('input')) {
-    const slot = state.directorySlots[state.activeDirectorySlot];
-    if (slot.currentPath && slot.currentPath !== slot.path) {
-      const parentPath = slot.currentPath.split('/').slice(0, -1).join('/') || slot.path;
-      loadFolderContents(parentPath);
+  // Quick slot assignment: only active when in click-to-assign mode
+  if (state.clickToAssignMode && state.selectedFile) {
+    // Number keys 0-9 to build slot number
+    if (e.key >= '0' && e.key <= '9') {
+      state.slotInput += e.key;
+      // Limit to 2 digits (max slot 20)
+      if (state.slotInput.length > 2) {
+        state.slotInput = state.slotInput.slice(-2);
+      }
+      setStatus(`Assign "${state.selectedFile.name}" to slot: ${state.slotInput}_ (Press Enter to confirm)`);
+      updateFileAssignMessage(state.slotInput);
+      e.preventDefault();
+      return;
     }
+    
+    // Backspace to delete last digit (only if typing a slot number)
+    if (e.key === 'Backspace' && state.slotInput.length > 0) {
+      state.slotInput = state.slotInput.slice(0, -1);
+      if (state.slotInput.length > 0) {
+        setStatus(`Assign "${state.selectedFile.name}" to slot: ${state.slotInput}_ (Press Enter to confirm)`);
+      } else {
+        setStatus(`"${state.selectedFile.name}" - Click a slot OR type 1-20 + Enter`);
+      }
+      updateFileAssignMessage(state.slotInput);
+      e.preventDefault();
+      return;
+    }
+    
+    // Enter to confirm assignment (only if typing a slot number)
+    if (e.key === 'Enter' && state.slotInput.length > 0) {
+      const slotNum = parseInt(state.slotInput);
+      if (slotNum >= 1 && slotNum <= DECK_COUNT) {
+        loadToDeck(slotNum, state.selectedFile);
+        setStatus(`Assigned "${state.selectedFile.name}" to slot ${slotNum}`);
+        state.slotInput = '';
+        updateFileAssignMessage('');
+        exitClickToAssignMode();
+      } else {
+        setStatus(`Invalid slot number. Enter 1-${DECK_COUNT}`);
+        state.slotInput = '';
+        updateFileAssignMessage('');
+      }
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  // Arrow key navigation
+  if (e.key === 'ArrowUp') {
+    handleArrowNavigation('up');
     e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowDown') {
+    handleArrowNavigation('down');
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowLeft') {
+    handleArrowNavigation('left');
+    e.preventDefault();
+    return;
+  }
+  if (e.key === 'ArrowRight') {
+    handleArrowNavigation('right');
+    e.preventDefault();
+    return;
+  }
+  
+  // Enter on focused item (when not in slot assignment mode)
+  if (e.key === 'Enter' && !state.clickToAssignMode) {
+    if (handleFocusedItemAction('enter')) {
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  // Backspace on focused deck/hotbutton to clear it
+  if (e.key === 'Backspace' && !state.clickToAssignMode) {
+    if (handleFocusedItemAction('backspace')) {
+      e.preventDefault();
+      return;
+    }
+  }
+  
+  // Q on focused deck/hotbutton to toggle queue
+  if (e.key === 'q' || e.key === 'Q') {
+    if (handleFocusedItemAction('queue')) {
+      e.preventDefault();
+      return;
+    }
   }
 }
 

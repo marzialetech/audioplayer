@@ -8,7 +8,7 @@ const store = new Store();
 let mainWindow;
 
 // Set app name (important for macOS dock and menu bar)
-app.setName('rockstar v1.2 by Pixamation');
+app.setName('rockstar v1.3 by Pixamation');
 
 // Set dock icon on macOS before app is ready
 if (process.platform === 'darwin') {
@@ -32,7 +32,7 @@ function createWindow() {
       nodeIntegration: false
     },
     icon: iconPath,
-    title: 'rockstar v1.2 by Pixamation'
+    title: 'rockstar v1.3 by Pixamation'
   });
   
   // Set dock icon again after window creation (ensures it sticks)
@@ -107,8 +107,8 @@ function createWindow() {
           click: () => {
             dialog.showMessageBox(mainWindow, {
               type: 'info',
-              title: 'About rockstar v1.2 by Pixamation',
-              message: 'rockstar v1.2 by Pixamation',
+              title: 'About rockstar v1.3 by Pixamation',
+              message: 'rockstar v1.3 by Pixamation',
               detail: 'Professional audio playback application for radio broadcasting and live audio management.\n\nDeveloped by Pixamation\nhttps://pixamation.com',
               icon: path.join(__dirname, 'assets', 'icon.png')
             });
@@ -264,4 +264,35 @@ ipcMain.handle('save-hot-buttons', (event, buttons) => {
 // Load hot button configuration
 ipcMain.handle('load-hot-buttons', () => {
   return store.get('hotButtons', {});
+});
+
+// Read a slice of a file for metadata extraction
+ipcMain.handle('read-file-slice', async (event, filePath, start, length) => {
+  try {
+    const stats = await fs.promises.stat(filePath);
+    const actualStart = start < 0 ? Math.max(0, stats.size + start) : start;
+    const actualLength = Math.min(length, stats.size - actualStart);
+    
+    const fileHandle = await fs.promises.open(filePath, 'r');
+    const buffer = Buffer.alloc(actualLength);
+    await fileHandle.read(buffer, 0, actualLength, actualStart);
+    await fileHandle.close();
+    
+    // Return as array for serialization
+    return Array.from(buffer);
+  } catch (error) {
+    console.error('Error reading file slice:', error);
+    return null;
+  }
+});
+
+// Get file size
+ipcMain.handle('get-file-size', async (event, filePath) => {
+  try {
+    const stats = await fs.promises.stat(filePath);
+    return stats.size;
+  } catch (error) {
+    console.error('Error getting file size:', error);
+    return 0;
+  }
 });

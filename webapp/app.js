@@ -1,5 +1,5 @@
 /**
- * rockstar v1.2 by Pixamation - Web Application
+ * rockstar v1.3 by Pixamation - Web Application
  * Browser-based audio playback application
  */
 
@@ -45,7 +45,15 @@ const state = {
   debugMode: false, // Debug mode to show keystrokes
   keyboardEnabled: false, // Toggle for enabling/disabling keyboard shortcuts (default OFF)
   sortColumn: 'name', // Current sort column: 'name', 'title', 'artist', 'album'
-  sortDirection: 'asc' // Sort direction: 'asc' or 'desc'
+  sortDirection: 'asc', // Sort direction: 'asc' or 'desc'
+  
+  // Metadata extraction queue system
+  metadataQueue: {
+    priority: new Set(),    // Indices of visible files (high priority)
+    pending: new Set(),     // All files needing extraction
+    processing: false,      // Is the queue processor running?
+    abortController: null   // To cancel ongoing extraction when folder changes
+  }
 };
 
 // Initialize decks 1-20
@@ -91,7 +99,7 @@ const elements = {
 
 // Initialize Application
 function init() {
-  console.log('Initializing rockstar v1.2...');
+  console.log('Initializing rockstar v1.3...');
   
   // Initialize audio elements and visualizers
   for (let i = 1; i <= DECK_COUNT; i++) {
@@ -1056,23 +1064,178 @@ async function extractMetadata(fileItem) {
   }
 }
 
-// Extract metadata for all files in the current view
-async function extractAllMetadata() {
-  const audioFiles = state.currentFiles.filter(f => f.type === 'file');
-  
-  // Extract in batches to avoid blocking
-  for (const file of audioFiles) {
-    await extractMetadata(file);
+// Metadata extraction queue configuration
+const METADATA_CONFIG = {
+  BATCH_SIZE: 4,           // Process 4 files concurrently
+  BATCH_DELAY_MS: 50,      // 50ms pause between batches (keeps CPU cool)
+  PRIORITY_CHECK_MS: 100   // Check for priority items every 100ms
+};
+
+// Initialize metadata extraction queue for current files
+function initMetadataQueue() {
+  // Cancel any ongoing extraction
+  if (state.metadataQueue.abortController) {
+    state.metadataQueue.abortController.abort();
   }
   
-  // Re-render after extraction
-  renderFileList();
+  // Reset queue
+  state.metadataQueue.priority.clear();
+  state.metadataQueue.pending.clear();
+  state.metadataQueue.processing = false;
+  state.metadataQueue.abortController = new AbortController();
+  
+  // Add all audio files to pending queue
+  state.currentFiles.forEach((file, index) => {
+    if (file.type === 'file' && !file.metadata) {
+      state.metadataQueue.pending.add(index);
+    }
+  });
+  
+  // Setup intersection observer for visible files
+  setupMetadataObserver();
+  
+  // Start processing
+  processMetadataQueue();
+}
+
+// Intersection Observer to detect visible file items
+let metadataObserver = null;
+
+function setupMetadataObserver() {
+  // Disconnect existing observer
+  if (metadataObserver) {
+    metadataObserver.disconnect();
+  }
+  
+  // Create new observer
+  metadataObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const index = parseInt(entry.target.dataset.fileIndex);
+      if (isNaN(index)) return;
+      
+      if (entry.isIntersecting) {
+        // File is visible - add to priority queue if still pending
+        if (state.metadataQueue.pending.has(index)) {
+          state.metadataQueue.priority.add(index);
+        }
+      } else {
+        // File scrolled out of view - remove from priority
+        state.metadataQueue.priority.delete(index);
+      }
+    });
+  }, {
+    root: elements.fileList,
+    rootMargin: '100px 0px', // Pre-load items 100px before they're visible
+    threshold: 0
+  });
+  
+  // Observe all file items
+  document.querySelectorAll('.file-item[data-file-index]').forEach(el => {
+    metadataObserver.observe(el);
+  });
+}
+
+// Process the metadata queue with priority for visible files
+async function processMetadataQueue() {
+  if (state.metadataQueue.processing) return;
+  state.metadataQueue.processing = true;
+  
+  const abortSignal = state.metadataQueue.abortController?.signal;
+  
+  while (state.metadataQueue.pending.size > 0) {
+    // Check if aborted (folder changed)
+    if (abortSignal?.aborted) {
+      state.metadataQueue.processing = false;
+      return;
+    }
+    
+    // Get next batch - prioritize visible files
+    const batch = [];
+    
+    // First, take from priority queue (visible files)
+    for (const index of state.metadataQueue.priority) {
+      if (batch.length >= METADATA_CONFIG.BATCH_SIZE) break;
+      if (state.metadataQueue.pending.has(index)) {
+        batch.push(index);
+      }
+    }
+    
+    // Fill remaining slots from pending queue
+    if (batch.length < METADATA_CONFIG.BATCH_SIZE) {
+      for (const index of state.metadataQueue.pending) {
+        if (batch.length >= METADATA_CONFIG.BATCH_SIZE) break;
+        if (!batch.includes(index)) {
+          batch.push(index);
+        }
+      }
+    }
+    
+    if (batch.length === 0) break;
+    
+    // Remove from queues
+    batch.forEach(index => {
+      state.metadataQueue.pending.delete(index);
+      state.metadataQueue.priority.delete(index);
+    });
+    
+    // Process batch concurrently
+    await Promise.all(batch.map(async (index) => {
+      const file = state.currentFiles[index];
+      if (file && !file.metadata) {
+        await extractMetadata(file);
+        // Update just this row in the DOM
+        updateFileRow(index, file);
+      }
+    }));
+    
+    // Small delay between batches to keep CPU responsive
+    await new Promise(resolve => setTimeout(resolve, METADATA_CONFIG.BATCH_DELAY_MS));
+  }
+  
+  state.metadataQueue.processing = false;
+}
+
+// Update a single file row in the DOM without full re-render
+function updateFileRow(index, file) {
+  const row = document.querySelector(`.file-item[data-file-index="${index}"]`);
+  if (!row || !file.metadata) return;
+  
+  const duration = file.metadata.duration ? formatDuration(file.metadata.duration) : '';
+  const title = file.metadata.title || '';
+  const artist = file.metadata.artist || '';
+  const album = file.metadata.album || '';
+  
+  // Update individual cells
+  const durationCell = row.querySelector('.file-col-duration');
+  const titleCell = row.querySelector('.file-col-title');
+  const artistCell = row.querySelector('.file-col-artist');
+  const albumCell = row.querySelector('.file-col-album');
+  
+  if (durationCell) durationCell.textContent = duration;
+  if (titleCell) {
+    titleCell.textContent = title;
+    titleCell.title = title;
+  }
+  if (artistCell) {
+    artistCell.textContent = artist;
+    artistCell.title = artist;
+  }
+  if (albumCell) {
+    albumCell.textContent = album;
+    albumCell.title = album;
+  }
+}
+
+// Legacy function for compatibility - now just starts the queue
+async function extractAllMetadata() {
+  initMetadataQueue();
 }
 
 function renderFileList() {
   elements.fileList.innerHTML = '';
   
-  let items = state.currentFiles;
+  // Add original index to each item for tracking
+  let items = state.currentFiles.map((f, idx) => ({ ...f, _originalIndex: idx }));
   
   // Apply search filter (searches all metadata fields)
   if (state.searchQuery) {
@@ -1123,6 +1286,11 @@ function renderFileList() {
     const div = document.createElement('div');
     div.className = item.type === 'folder' ? 'file-item folder-item' : 'file-item';
     div.draggable = item.type === 'file';
+    
+    // Add data attribute for metadata queue tracking (files only)
+    if (item.type === 'file' && item._originalIndex !== undefined) {
+      div.dataset.fileIndex = item._originalIndex;
+    }
     
     const icon = item.type === 'folder' ? '📁' : '🎵';
     const title = item.metadata?.title || '';

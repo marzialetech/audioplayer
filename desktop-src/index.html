@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; media-src 'self' file:; img-src 'self' file:">
-  <title>rockstar v1.2 by Pixamation</title>
+  <title>rockstar v1.3 by Pixamation</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -12,12 +12,21 @@
     <!-- Header -->
     <header class="app-header">
       <div class="brand">
-        <h1>rockstar v1.2</h1>
+        <h1>rockstar v1.3</h1>
       </div>
       <div class="master-controls">
-        <label>Master Volume:</label>
-        <input type="range" id="masterVolume" min="0" max="100" value="100" class="master-volume-slider">
-        <span id="masterVolumeValue">100%</span>
+        <div class="keyboard-toggle">
+          <label class="toggle-label" for="keyboardToggle">Enable keyboard shortcuts</label>
+          <label class="toggle-switch">
+            <input type="checkbox" id="keyboardToggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="master-volume-control">
+          <label>Master Volume:</label>
+          <input type="range" id="masterVolume" min="0" max="100" value="100" class="master-volume-slider">
+          <span id="masterVolumeValue">100%</span>
+        </div>
       </div>
     </header>
 
@@ -25,8 +34,16 @@
     <main class="main-content">
       <!-- Left Panel - Audio Decks -->
       <section class="audio-decks-panel">
-        <h2>Audio Decks</h2>
+        <div class="panel-header">
+          <h2>Audio Decks</h2>
+          <button class="btn-layout-toggle" id="btnLayoutToggle" title="Toggle 20x1 / 10x2 layout">
+            <span class="layout-icon">▤</span>
+            <span class="layout-label">20×1</span>
+          </button>
+        </div>
         <div class="audio-decks" id="audioDecks">
+          <!-- Column resize handle for 10x2 layout -->
+          <div class="column-resize-handle" id="columnResizeHandle" style="display: none;"></div>
           <!-- Audio Decks 1-20 -->
           <div class="audio-deck" data-deck="1">
             <div class="deck-header">
@@ -47,7 +64,7 @@
               <button class="btn-pause" data-deck="1" title="Pause">⏸</button>
               <button class="btn-stop" data-deck="1" title="Stop">⏹</button>
               <input type="range" class="deck-volume" data-deck="1" min="0" max="100" value="100" title="Volume">
-              <canvas class="deck-visualizer" id="visualizer1" width="80" height="28"></canvas>
+              <canvas class="deck-visualizer" id="visualizer1" width="80" height="48"></canvas>
             </div>
             <audio id="audio1" preload="metadata"></audio>
           </div>
@@ -510,33 +527,36 @@
         </div>
       </section>
 
+      <!-- Resize Handle -->
+      <div class="resize-handle" id="audioDecksResizeHandle"></div>
+
       <!-- Center Panel - Hot Buttons -->
       <section class="hot-buttons-panel">
         <h2>Hot Buttons</h2>
         <div class="hot-buttons-grid" id="hotButtonsGrid">
           <!-- Hot buttons 1-20 -->
-          <button class="hot-button" data-slot="1"><span class="hot-number">1</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="2"><span class="hot-number">2</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="3"><span class="hot-number">3</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="4"><span class="hot-number">4</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="5"><span class="hot-number">5</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="6"><span class="hot-number">6</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="7"><span class="hot-number">7</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="8"><span class="hot-number">8</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="9"><span class="hot-number">9</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="10"><span class="hot-number">10</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="11"><span class="hot-number">11</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="12"><span class="hot-number">12</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="13"><span class="hot-number">13</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="14"><span class="hot-number">14</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="15"><span class="hot-number">15</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="16"><span class="hot-number">16</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="17"><span class="hot-number">17</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="18"><span class="hot-number">18</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="19"><span class="hot-number">19</span><span class="hot-label">Empty</span></button>
-          <button class="hot-button" data-slot="20"><span class="hot-number">20</span><span class="hot-label">Empty</span></button>
+          <div class="hot-button-wrapper" data-slot="1"><button class="hot-button" data-slot="1"><span class="hot-number">1</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="1" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="2"><button class="hot-button" data-slot="2"><span class="hot-number">2</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="2" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="3"><button class="hot-button" data-slot="3"><span class="hot-number">3</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="3" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="4"><button class="hot-button" data-slot="4"><span class="hot-number">4</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="4" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="5"><button class="hot-button" data-slot="5"><span class="hot-number">5</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="5" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="6"><button class="hot-button" data-slot="6"><span class="hot-number">6</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="6" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="7"><button class="hot-button" data-slot="7"><span class="hot-number">7</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="7" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="8"><button class="hot-button" data-slot="8"><span class="hot-number">8</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="8" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="9"><button class="hot-button" data-slot="9"><span class="hot-number">9</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="9" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="10"><button class="hot-button" data-slot="10"><span class="hot-number">10</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="10" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="11"><button class="hot-button" data-slot="11"><span class="hot-number">11</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="11" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="12"><button class="hot-button" data-slot="12"><span class="hot-number">12</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="12" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="13"><button class="hot-button" data-slot="13"><span class="hot-number">13</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="13" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="14"><button class="hot-button" data-slot="14"><span class="hot-number">14</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="14" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="15"><button class="hot-button" data-slot="15"><span class="hot-number">15</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="15" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="16"><button class="hot-button" data-slot="16"><span class="hot-number">16</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="16" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="17"><button class="hot-button" data-slot="17"><span class="hot-number">17</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="17" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="18"><button class="hot-button" data-slot="18"><span class="hot-number">18</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="18" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="19"><button class="hot-button" data-slot="19"><span class="hot-number">19</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="19" title="Queue after previous">Q</button></div>
+          <div class="hot-button-wrapper" data-slot="20"><button class="hot-button" data-slot="20"><span class="hot-number">20</span><span class="hot-label">Empty</span></button><button class="btn-hot-queue" data-slot="20" title="Queue after previous">Q</button></div>
         </div>
-        <p class="hot-buttons-hint">Drag audio files to assign. Click to play. Right-click to clear.</p>
+        <p class="hot-buttons-hint">Drag or click file, then click deck/button. Right-click to clear.</p>
       </section>
 
       <!-- Right Panel - File Browser -->
@@ -572,16 +592,57 @@
         <div class="search-container">
           <input type="text" id="searchInput" placeholder="Search audio files..." class="search-input">
           <button id="btnSearch" class="btn-search">Search</button>
+          <button id="btnResetColumns" class="btn-reset-columns" title="Reset column widths">↔</button>
         </div>
 
         <!-- File List -->
         <div class="file-list-container">
+          <div class="file-list-header" id="fileListHeader">
+            <div class="file-header-col file-col-name sortable active" data-sort="name">
+              <span>Name</span>
+              <span class="sort-indicator">▲</span>
+            </div>
+            <div class="file-header-col file-col-duration sortable" data-sort="duration">
+              <span>Duration</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-col file-col-title sortable" data-sort="title">
+              <span>Title</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-col file-col-artist sortable" data-sort="artist">
+              <span>Artist</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-col file-col-album sortable" data-sort="album">
+              <span>Album</span>
+              <span class="sort-indicator"></span>
+            </div>
+            <div class="file-header-scrollbar-spacer"></div>
+          </div>
           <div class="file-list" id="fileList">
             <p class="file-list-empty">Select a directory to browse audio files.</p>
+          </div>
+          <div class="file-assign-message" id="fileAssignMessage"></div>
+        </div>
+        
+        <!-- Resize handle between file list and metadata panel -->
+        <div class="metadata-resize-handle" id="metadataResizeHandle"></div>
+        
+        <!-- Fixed Metadata Preview Panel -->
+        <div class="metadata-preview-panel" id="metadataPreviewPanel">
+          <div class="metadata-preview-header">
+            <span class="metadata-preview-title">Metadata</span>
+            <span class="metadata-preview-filename" id="metadataPreviewFilename">Select a file to view metadata</span>
+          </div>
+          <div class="metadata-preview-content" id="metadataPreviewContent">
           </div>
         </div>
       </section>
     </main>
+    
+    <!-- Debug overlay -->
+    <div class="debug-overlay" id="debugOverlay"></div>
 
     <!-- Status Bar -->
     <footer class="status-bar">

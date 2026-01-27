@@ -1,4 +1,4 @@
-# rockstar v1.2 by Pixamation - Web Version
+# rockstar v1.3 by Pixamation - Web Version
 
 This is the browser-based version of rockstar that can be deployed to any web server.
 
@@ -79,4 +79,4 @@ Works in all modern browsers:
 
 ---
 
-**rockstar v1.2 by Pixamation**
+**rockstar v1.3 by Pixamation**

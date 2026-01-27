@@ -16,5 +16,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   
   // Hot buttons
   saveHotButtons: (buttons) => ipcRenderer.invoke('save-hot-buttons', buttons),
-  loadHotButtons: () => ipcRenderer.invoke('load-hot-buttons')
+  loadHotButtons: () => ipcRenderer.invoke('load-hot-buttons'),
+  
+  // File reading for metadata extraction
+  readFileSlice: (filePath, start, length) => ipcRenderer.invoke('read-file-slice', filePath, start, length),
+  getFileSize: (filePath) => ipcRenderer.invoke('get-file-size', filePath),
+  
+  // Listen for menu-triggered directory selection
+  onDirectorySelected: (callback) => ipcRenderer.on('directory-selected', (event, data) => callback(data))
 });

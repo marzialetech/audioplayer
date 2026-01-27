@@ -1,7 +1,7 @@
-# rockstar v1.2 by Pixamation
+# rockstar v1.3 by Pixamation
 
 <p align="center">
-  <img src="assets/icon.png" alt="rockstar v1.2 by Pixamation" width="128" height="128">
+  <img src="assets/icon.png" alt="rockstar v1.3 by Pixamation" width="128" height="128">
 </p>
 
 <p align="center">
@@ -115,6 +115,6 @@ MIT License - See [LICENSE](LICENSE) file for details.
 ---
 
 <p align="center">
-  <strong>rockstar v1.2 by Pixamation</strong><br>
+  <strong>rockstar v1.3 by Pixamation</strong><br>
   Making audio management simple and powerful
 </p>
