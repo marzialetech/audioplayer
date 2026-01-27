@@ -418,6 +418,15 @@ function setupEventListeners() {
     });
   });
   
+  // Hot button queue buttons
+  document.querySelectorAll('.btn-hot-queue').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation(); // Don't trigger hot button click
+      const slot = parseInt(btn.dataset.slot);
+      toggleQueue(slot);
+    });
+  });
+  
   // Audio decks - click to assign, drag and drop
   document.querySelectorAll('.audio-deck').forEach(deck => {
     // Click on deck to assign selected file
@@ -1878,19 +1887,38 @@ function toggleQueue(deckNum) {
   updateQueueButtonState(deckNum);
   
   if (state.decks[deckNum].queued) {
-    setStatus(`Deck ${deckNum} queued to play after deck ${deckNum - 1}`);
+    // Show wrap-around message for deck 1
+    const prevDeck = deckNum === 1 ? DECK_COUNT : deckNum - 1;
+    if (deckNum === 1) {
+      setStatus(`Deck 1 queued to play after deck 20 (wrap-around)`);
+    } else {
+      setStatus(`Deck ${deckNum} queued to play after deck ${prevDeck}`);
+    }
   } else {
     setStatus(`Deck ${deckNum} removed from queue`);
   }
 }
 
-// Update queue button visual state
+// Update queue button visual state (both audio deck and hot button)
 function updateQueueButtonState(deckNum) {
-  const btn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
-  if (state.decks[deckNum].queued) {
-    btn.classList.add('active');
-  } else {
-    btn.classList.remove('active');
+  // Update audio deck queue button
+  const deckBtn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
+  if (deckBtn) {
+    if (state.decks[deckNum].queued) {
+      deckBtn.classList.add('active');
+    } else {
+      deckBtn.classList.remove('active');
+    }
+  }
+  
+  // Update hot button queue button
+  const hotBtn = document.querySelector(`.btn-hot-queue[data-slot="${deckNum}"]`);
+  if (hotBtn) {
+    if (state.decks[deckNum].queued) {
+      hotBtn.classList.add('active');
+    } else {
+      hotBtn.classList.remove('active');
+    }
   }
 }
 
@@ -1975,18 +2003,22 @@ function onDeckEnded(deckNum) {
     state.decks[deckNum].audio.volume = state.masterVolume;
   }
   
-  // Check if next deck (N+1) is queued BEFORE clearing
-  const nextDeck = deckNum + 1;
-  const shouldPlayNext = nextDeck <= DECK_COUNT && state.decks[nextDeck].queued && state.decks[nextDeck].file;
+  // Check if next deck is queued BEFORE clearing (with wrap-around: 20 -> 1)
+  const nextDeck = deckNum === DECK_COUNT ? 1 : deckNum + 1;
+  const shouldPlayNext = state.decks[nextDeck].queued && state.decks[nextDeck].file;
   
   // Auto-clear the deck that just finished
   clearDeck(deckNum);
   setStatus(`Deck ${deckNum} finished and cleared`);
   
-  // Now play the next queued deck if applicable
+  // Now play the next queued deck if applicable (supports wrap-around)
   if (shouldPlayNext) {
     playDeck(nextDeck);
-    setStatus(`Auto-playing queued deck ${nextDeck}`);
+    if (deckNum === DECK_COUNT && nextDeck === 1) {
+      setStatus(`Auto-playing queued deck 1 (wrapped from deck 20)`);
+    } else {
+      setStatus(`Auto-playing queued deck ${nextDeck}`);
+    }
   }
 }
 

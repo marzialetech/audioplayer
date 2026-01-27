@@ -611,6 +611,43 @@ section h2 {
   min-width: 0; /* Critical for grid constraints */
 }
 
+/* Hot button wrapper for button + queue button */
+.hot-button-wrapper {
+  display: flex;
+  gap: 3px;
+  min-width: 0;
+}
+
+.hot-button-wrapper .hot-button {
+  flex: 1;
+  min-width: 0;
+}
+
+/* Hot button queue button */
+.btn-hot-queue {
+  background: #2a2a4a;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  font-size: 10px;
+  font-weight: 600;
+  padding: 0 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.btn-hot-queue:hover {
+  background: var(--accent-blue);
+  color: #000;
+}
+
+.btn-hot-queue.active {
+  background: var(--accent-orange);
+  color: #000;
+  border-color: var(--accent-orange);
+}
+
 .hot-button {
   background: linear-gradient(180deg, #3a3a5a, #2a2a4a);
   border: 2px solid var(--border-color);
