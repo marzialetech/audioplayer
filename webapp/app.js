@@ -691,8 +691,13 @@ function sortItems(items) {
     if (col === 'name') {
       valA = a.name.toLowerCase();
       valB = b.name.toLowerCase();
+    } else if (col === 'duration') {
+      // Duration is numeric
+      valA = (a.metadata && a.metadata.duration) ? a.metadata.duration : 0;
+      valB = (b.metadata && b.metadata.duration) ? b.metadata.duration : 0;
+      return (valA - valB) * dir;
     } else {
-      // For metadata columns
+      // For metadata columns (strings)
       valA = (a.metadata && a.metadata[col]) ? a.metadata[col].toLowerCase() : '';
       valB = (b.metadata && b.metadata[col]) ? b.metadata[col].toLowerCase() : '';
     }
@@ -758,6 +763,7 @@ const METADATA_LABELS = {
   title: 'Title',
   artist: 'Artist',
   album: 'Album',
+  duration: 'Duration',
   grouping: 'Grouping',
   genre: 'Genre',
   track: 'Track',
@@ -954,6 +960,41 @@ function scanForID3InWav(buffer, metadataObj) {
   return false;
 }
 
+// Format duration in seconds to MM:SS or HH:MM:SS
+function formatDuration(seconds) {
+  if (!seconds || isNaN(seconds)) return '';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  const secs = Math.floor(seconds % 60);
+  if (hrs > 0) {
+    return `${hrs}:${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+  return `${mins}:${secs.toString().padStart(2, '0')}`;
+}
+
+// Get audio duration using a temporary audio element
+function getAudioDuration(file) {
+  return new Promise((resolve) => {
+    const audio = document.createElement('audio');
+    audio.preload = 'metadata';
+    const url = URL.createObjectURL(file);
+    audio.src = url;
+    audio.onloadedmetadata = () => {
+      URL.revokeObjectURL(url);
+      resolve(audio.duration);
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    };
+    // Timeout after 5 seconds
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve(null);
+    }, 5000);
+  });
+}
+
 async function extractMetadata(fileItem) {
   if (!fileItem.handle || fileItem.type !== 'file') return;
   if (fileItem.metadata) return; // Already extracted
@@ -962,6 +1003,12 @@ async function extractMetadata(fileItem) {
     const file = await fileItem.handle.getFile();
     fileItem.metadata = { title: '', artist: '', album: '' };
     const ext = file.name.split('.').pop().toLowerCase();
+    
+    // Get audio duration
+    const duration = await getAudioDuration(file);
+    if (duration) {
+      fileItem.metadata.duration = duration;
+    }
     
     if (ext === 'mp3') {
       const buffer = await file.slice(0, 256 * 1024).arrayBuffer();
@@ -984,7 +1031,7 @@ async function extractMetadata(fileItem) {
       console.log(`[WAV] ID3 found: ${foundID3}`);
       
       // Also check beginning of file for early LIST INFO (small files)
-      if (Object.values(fileItem.metadata).every(v => !v)) {
+      if (Object.values(fileItem.metadata).every(v => !v || v === fileItem.metadata.duration)) {
         const head = await file.slice(0, 256 * 1024).arrayBuffer();
         parseRiffListInfo(head, fileItem.metadata);
       }
@@ -1044,6 +1091,7 @@ function renderFileList() {
         <span class="file-icon">📁</span>
         <span class="file-name">Go Back</span>
       </div>
+      <div class="file-item-col file-col-length"></div>
       <div class="file-item-col file-col-title"></div>
       <div class="file-item-col file-col-artist"></div>
       <div class="file-item-col file-col-album"></div>
@@ -1068,12 +1116,14 @@ function renderFileList() {
     const title = item.metadata?.title || '';
     const artist = item.metadata?.artist || '';
     const album = item.metadata?.album || '';
+    const duration = item.metadata?.duration ? formatDuration(item.metadata.duration) : '';
     
     div.innerHTML = `
       <div class="file-item-col file-col-name">
         <span class="file-icon">${icon}</span>
         <span class="file-name">${item.name}</span>
       </div>
+      <div class="file-item-col file-col-length">${duration}</div>
       <div class="file-item-col file-col-title" title="${escapeHtml(title)}">${escapeHtml(title)}</div>
       <div class="file-item-col file-col-artist" title="${escapeHtml(artist)}">${escapeHtml(artist)}</div>
       <div class="file-item-col file-col-album" title="${escapeHtml(album)}">${escapeHtml(album)}</div>
@@ -1148,7 +1198,9 @@ function updateMetadataPreview(item) {
     .filter(([key, value]) => value)
     .map(([key, value]) => {
       const label = METADATA_LABELS[key] || key;
-      return { key, label, value };
+      // Format duration as MM:SS
+      const displayVal = key === 'duration' ? formatDuration(value) : value;
+      return { key, label, value: displayVal };
     });
   
   // If no metadata, show a message
@@ -1192,7 +1244,7 @@ const columnResizeState = {
 
 // Setup column resizing functionality
 function setupColumnResizing() {
-  const resizableCols = ['name', 'title', 'artist']; // album is flex, doesn't need resize
+  const resizableCols = ['name', 'length', 'title', 'artist']; // album is flex, doesn't need resize
   
   resizableCols.forEach(colName => {
     const headerCol = elements.fileListHeader.querySelector(`[data-sort="${colName}"]`);
