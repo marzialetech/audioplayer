@@ -649,6 +649,9 @@ async function loadDirectoryContents(dirHandle, subPath = []) {
     renderFileList();
     setStatus(`Loaded ${files.length} audio files, ${folders.length} folders`);
     
+    // Load column widths for this folder (or reset to defaults if none saved)
+    loadOrResetColumnWidths();
+    
     // Extract metadata in background
     extractAllMetadata();
   } catch (err) {
@@ -1322,6 +1325,13 @@ function setColumnWidth(colName, width) {
   });
 }
 
+// Get storage key for current folder's column widths
+function getColumnWidthsKey() {
+  const slot = state.directorySlots[state.activeDirectorySlot];
+  const folderPath = slot.path ? [slot.path, ...state.currentPath].join('/') : '';
+  return `fileListColumnWidths_${folderPath}`;
+}
+
 function saveColumnWidths() {
   const widths = {};
   ['name', 'duration', 'title', 'artist'].forEach(colName => {
@@ -1330,27 +1340,32 @@ function saveColumnWidths() {
       widths[colName] = headerCol.offsetWidth;
     }
   });
-  localStorage.setItem('fileListColumnWidths', JSON.stringify(widths));
+  const key = getColumnWidthsKey();
+  localStorage.setItem(key, JSON.stringify(widths));
 }
 
 function loadColumnWidths() {
   try {
-    const saved = localStorage.getItem('fileListColumnWidths');
+    const key = getColumnWidthsKey();
+    const saved = localStorage.getItem(key);
     if (saved) {
       const widths = JSON.parse(saved);
       Object.entries(widths).forEach(([colName, width]) => {
         setColumnWidth(colName, width);
       });
+      return true; // Widths were loaded
     }
   } catch (err) {
     console.log('Could not load column widths:', err);
   }
+  return false; // No saved widths
 }
 
 // Apply saved column widths to newly rendered file rows
 function applyColumnWidthsToRows() {
   try {
-    const saved = localStorage.getItem('fileListColumnWidths');
+    const key = getColumnWidthsKey();
+    const saved = localStorage.getItem(key);
     if (saved) {
       const widths = JSON.parse(saved);
       Object.entries(widths).forEach(([colName, width]) => {
@@ -1372,26 +1387,37 @@ const DEFAULT_COLUMN_WIDTHS = {
   artist: 120
 };
 
-// Reset column widths to defaults
-function resetColumnWidths() {
-  // Clear saved widths
-  localStorage.removeItem('fileListColumnWidths');
-  
-  // Apply default widths
+// Apply default column widths (without clearing saved - used when entering folder with no prefs)
+function applyDefaultColumnWidths() {
   Object.entries(DEFAULT_COLUMN_WIDTHS).forEach(([colName, width]) => {
-    // Reset header
     const headerCol = elements.fileListHeader?.querySelector(`[data-sort="${colName}"]`);
     if (headerCol) {
       headerCol.style.width = `${width}px`;
     }
-    
-    // Reset file rows
     document.querySelectorAll(`.file-item .file-col-${colName}`).forEach(col => {
       col.style.width = `${width}px`;
     });
   });
+}
+
+// Reset column widths to defaults for current folder
+function resetColumnWidths() {
+  // Clear saved widths for this folder
+  const key = getColumnWidthsKey();
+  localStorage.removeItem(key);
+  
+  // Apply default widths
+  applyDefaultColumnWidths();
   
   setStatus('Column widths reset to default');
+}
+
+// Load column widths for current folder, or apply defaults if none saved
+function loadOrResetColumnWidths() {
+  const loaded = loadColumnWidths();
+  if (!loaded) {
+    applyDefaultColumnWidths();
+  }
 }
 
 // Metadata panel resize state
