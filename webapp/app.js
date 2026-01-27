@@ -1313,16 +1313,21 @@ function renderFileList() {
       div.addEventListener('click', () => navigateToFolder(item.name));
       div.addEventListener('dblclick', () => navigateToFolder(item.name));
     } else {
+      // Use original index to get current file state (with extracted metadata)
+      const originalIndex = item._originalIndex;
+      const getOriginalFile = () => state.currentFiles[originalIndex] || item;
+      
       div.addEventListener('click', () => {
-        selectFile(div, item);
+        const originalFile = getOriginalFile();
+        selectFile(div, originalFile);
         // Update the metadata preview panel
-        updateMetadataPreview(item);
+        updateMetadataPreview(originalFile);
       });
-      div.addEventListener('dblclick', () => loadToFirstEmptyDeck(item));
+      div.addEventListener('dblclick', () => loadToFirstEmptyDeck(getOriginalFile()));
       
       div.addEventListener('dragstart', (e) => {
         // Store file in state (handles can't be serialized to JSON)
-        state.draggingFile = item;
+        state.draggingFile = getOriginalFile();
         e.dataTransfer.setData('text/plain', item.name);
         e.dataTransfer.effectAllowed = 'copy';
         div.classList.add('dragging');
@@ -1336,7 +1341,7 @@ function renderFileList() {
       
       div.addEventListener('contextmenu', (e) => {
         e.preventDefault();
-        showContextMenu(e, item);
+        showContextMenu(e, getOriginalFile());
       });
     }
     
