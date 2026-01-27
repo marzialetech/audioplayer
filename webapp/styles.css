@@ -1268,7 +1268,7 @@ section h2 {
   border-radius: 4px;
   height: 100px;
   min-height: 60px;
-  max-height: 300px;
+  max-height: 375px;
   overflow-y: auto;
   flex-shrink: 0;
 }
