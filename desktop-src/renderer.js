@@ -348,7 +348,7 @@ function setupEventListeners() {
       // Don't switch if clicking the button itself
       if (e.target.classList.contains('btn-select-dir')) return;
       const slotNum = parseInt(slot.dataset.slot);
-      switchToDirectorySlot(slotNum);
+        switchToDirectorySlot(slotNum);
     });
   });
   
@@ -690,8 +690,8 @@ async function loadDirectoryContents(basePath, subPath = []) {
     if (result.error) {
       console.error('Error loading directory:', result.error);
       setStatus('Error loading directory');
-      return;
-    }
+    return;
+  }
     
     // Transform to our format
     const folders = result.folders.map(f => ({
@@ -710,8 +710,8 @@ async function loadDirectoryContents(basePath, subPath = []) {
     state.currentFiles = [...folders, ...files];
     state.currentPath = subPath;
     state.currentBasePath = basePath;
-    
-    // Update path display
+  
+  // Update path display
     const slot = state.directorySlots[state.activeDirectorySlot];
     const displayPath = [slot.name || basePath, ...subPath].join(' / ');
     elements.currentPathDisplay.textContent = displayPath;
@@ -2132,9 +2132,9 @@ function updateQueueButtonState(deckNum) {
   // Update audio deck queue button
   const deckBtn = document.querySelector(`.btn-queue[data-deck="${deckNum}"]`);
   if (deckBtn) {
-    if (state.decks[deckNum].queued) {
+  if (state.decks[deckNum].queued) {
       deckBtn.classList.add('active');
-    } else {
+  } else {
       deckBtn.classList.remove('active');
     }
   }
@@ -2207,7 +2207,7 @@ function updateHotButtonDisplay(deckNum) {
         
         if (textWidth > containerWidth) {
           label.classList.add('scrolling');
-        } else {
+  } else {
           label.classList.remove('scrolling');
         }
       }
@@ -2245,7 +2245,7 @@ function onDeckEnded(deckNum) {
     if (deckNum === DECK_COUNT && nextDeck === 1) {
       setStatus(`Auto-playing queued deck 1 (wrapped from deck 20)`);
     } else {
-      setStatus(`Auto-playing queued deck ${nextDeck}`);
+    setStatus(`Auto-playing queued deck ${nextDeck}`);
     }
   }
 }
@@ -2352,7 +2352,7 @@ function handleArrowNavigation(direction) {
         } else if (deckNum === 11) {
           // From deck 11, wrap to deck 20
           setKeyboardFocus('decks', 19);
-        } else {
+      } else {
           setKeyboardFocus('decks', index - 1);
         }
       } else if (direction === 'down') {
@@ -2362,7 +2362,7 @@ function handleArrowNavigation(direction) {
         } else if (deckNum === 20) {
           // From deck 20, wrap to deck 11
           setKeyboardFocus('decks', 10);
-        } else {
+      } else {
           setKeyboardFocus('decks', index + 1);
         }
       } else if (direction === 'right') {
@@ -2705,7 +2705,7 @@ function handleKeyboard(e) {
       }
       setStatus(`Assign "${state.selectedFile.name}" to slot: ${state.slotInput}_ (Press Enter to confirm)`);
       updateFileAssignMessage(state.slotInput);
-      e.preventDefault();
+    e.preventDefault();
       return;
     }
     
