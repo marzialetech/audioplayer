@@ -392,6 +392,10 @@ function setupEventListeners() {
       const audio = state.decks[deckNum].audio;
       audio.volume = (e.target.value / 100) * state.masterVolume;
     });
+    
+    // Prevent volume slider drag from triggering deck drag
+    slider.addEventListener('mousedown', (e) => e.stopPropagation());
+    slider.addEventListener('dragstart', (e) => e.preventDefault());
   });
   
   // Progress bar seeking
