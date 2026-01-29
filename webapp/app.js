@@ -459,6 +459,12 @@ function setupEventListeners() {
     deck.draggable = true;
     
     deck.addEventListener('dragstart', (e) => {
+      // Don't start deck drag if dragging from a slider or button
+      if (e.target.matches('input[type="range"], button, .btn-play, .btn-pause, .btn-stop, .btn-queue, .btn-remove')) {
+        e.preventDefault();
+        return;
+      }
+      
       const deckNum = parseInt(deck.dataset.deck);
       // Only allow dragging if the deck has a file
       if (state.decks[deckNum].file) {
