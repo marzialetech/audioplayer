@@ -506,32 +506,7 @@ function setupEventListeners() {
       }
     });
     
-    // Make audio decks draggable for reordering
-    deck.draggable = true;
-    
-    deck.addEventListener('dragstart', (e) => {
-      // Don't start deck drag if dragging from a slider or button
-      if (e.target.matches('input[type="range"], button, .btn-play, .btn-pause, .btn-stop, .btn-queue, .btn-remove')) {
-        e.preventDefault();
-        return;
-      }
-      
-      const deckNum = parseInt(deck.dataset.deck);
-      // Only allow dragging if the deck has a file
-      if (state.decks[deckNum].file) {
-        state.draggingDeckSlot = deckNum;
-        e.dataTransfer.effectAllowed = 'move';
-        deck.classList.add('dragging');
-      } else {
-        e.preventDefault();
-      }
-    });
-    
-    deck.addEventListener('dragend', () => {
-      deck.classList.remove('dragging');
-      state.draggingDeckSlot = null;
-    });
-    
+    // Audio decks can receive drops (files from browser, hot buttons for swapping)
     deck.addEventListener('dragover', (e) => {
       e.preventDefault();
       deck.classList.add('drag-over');
